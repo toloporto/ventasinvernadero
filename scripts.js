@@ -1,30 +1,156 @@
 // scripts.js
 
-// --- CONFIGURACIÓN ---
+// --- CONFIGURACIÓN DE ENDPOINTS ---
+// RECUERDA: Reemplaza "nombre-unico-de-tu-api-flask" con tu nombre real de la aplicación Fly.io
 const API_BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/api/v1/cultivos';
+
+// ¡NUEVOS ENDPOINTS DE AUTENTICACIÓN!
+const API_REGISTRO_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/auth/registro';
+const API_LOGIN_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/auth/login';
+
+
+// --- VARIABLES GLOBALES DEL DOM ---
+
+// Elementos del Dashboard (Existentes)
 const tableBody = document.getElementById('cultivoList');
 const form = document.getElementById('cultivoForm');
 const submitButton = document.getElementById('submitButton');
-// Campo para guardar el ID o Nombre Original (lo usaremos para identificar la edición)
 const originalNameInput = document.getElementById('cultivoNombreOriginal'); 
 const loadingMessage = document.getElementById('loading-message');
 const searchInput = document.getElementById('cultivoSearch'); 
 
+// Elementos de Autenticación (Nuevos, del index.html modificado)
+const authContainer = document.getElementById('auth-container');
+const dashboardContainer = document.getElementById('dashboard-container');
+const loginForm = document.getElementById('login-form');
+const registroForm = document.getElementById('registro-form');
+const logoutButton = document.getElementById('logout-button');
+const authMessage = document.getElementById('auth-message');
+
+
 let modoEdicion = false; 
 let cultivosData = []; 
+let IS_AUTHENTICATED = false; // ¡Estado de la sesión!
 
-// --- FUNCIONES DE MANEJO DE LA API (CRUD) ---
+
+// --- 1. FUNCIONES DE AUTENTICACIÓN (NUEVAS) ---
+
+/**
+ * Muestra u oculta los contenedores de Auth y Dashboard.
+ */
+function toggleInterface(isAuthenticated) {
+    if (isAuthenticated) {
+        authContainer.style.display = 'none';
+        dashboardContainer.style.display = 'block';
+        // Una vez dentro, cargamos los datos
+        cargarCultivos(); 
+    } else {
+        authContainer.style.display = 'block';
+        dashboardContainer.style.display = 'none';
+        // Limpiar mensajes y formularios al cerrar sesión
+        authMessage.textContent = '';
+        loginForm.reset();
+        registroForm.reset();
+    }
+}
+
+/**
+ * Intenta registrar un nuevo usuario.
+ */
+async function manejarRegistro(event) {
+    event.preventDefault();
+    authMessage.textContent = 'Registrando...'; 
+    authMessage.style.color = 'blue';
+
+    const usuario = document.getElementById('registro-usuario').value;
+    const contraseña = document.getElementById('registro-contraseña').value;
+
+    try {
+        const response = await fetch(API_REGISTRO_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario, contraseña }),
+        });
+
+        const resultado = await response.json();
+
+        if (response.ok) {
+            authMessage.textContent = resultado.mensaje;
+            authMessage.style.color = 'var(--color-primary)';
+            registroForm.reset();
+        } else {
+            authMessage.textContent = `❌ Error: ${resultado.error || 'Fallo en el registro'}`;
+            authMessage.style.color = 'var(--color-danger)';
+        }
+    } catch (error) {
+        authMessage.textContent = '❌ Error de conexión al registrar.';
+        authMessage.style.color = 'var(--color-danger)';
+    }
+}
+
+/**
+ * Intenta iniciar sesión.
+ */
+async function manejarLogin(event) {
+    event.preventDefault();
+    authMessage.textContent = 'Iniciando sesión...';
+    authMessage.style.color = 'blue';
+    
+    const usuario = document.getElementById('login-usuario').value;
+    const contraseña = document.getElementById('login-contraseña').value;
+
+    try {
+        const response = await fetch(API_LOGIN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario, contraseña }),
+        });
+
+        const resultado = await response.json();
+
+        if (response.ok) {
+            // Éxito en el login
+            IS_AUTHENTICATED = true;
+            toggleInterface(true);
+            authMessage.textContent = ''; // Limpiar mensaje de auth
+        } else {
+            authMessage.textContent = `❌ Error: ${resultado.error || 'Fallo en la autenticación'}`;
+            authMessage.style.color = 'var(--color-danger)';
+        }
+    } catch (error) {
+        authMessage.textContent = '❌ Error de conexión al intentar iniciar sesión.';
+        authMessage.style.color = 'var(--color-danger)';
+    }
+}
+
+/**
+ * Cierra la sesión y vuelve a la pantalla de login.
+ */
+function cerrarSesion() {
+    IS_AUTHENTICATED = false;
+    toggleInterface(false);
+    // Limpiar el formulario de cultivos y datos de la tabla
+    tableBody.innerHTML = '';
+    cultivosData = [];
+    resetFormulario();
+    alert('Sesión cerrada.');
+}
+
+
+// --- 2. FUNCIONES DE MANEJO DE LA API (CRUD EXISTENTES, CON CHECK DE AUTH) ---
 
 /**
  * 1. GET (Leer): Carga, procesa y renderiza todos los cultivos.
  */
 async function cargarCultivos() {
+    // ⚠️ REVISIÓN: Solo carga si está autenticado
+    if (!IS_AUTHENTICATED) return; 
+    
     loadingMessage.textContent = 'Cargando datos de la API...';
     try {
         const response = await fetch(API_BASE_URL);
         
         if (!response.ok) {
-            // Manejar errores de la API (500, 404 de API, etc.)
             const errorText = await response.text();
             throw new Error(`Error de la API: ${response.status} - ${errorText}`);
         }
@@ -40,7 +166,6 @@ async function cargarCultivos() {
 
     } catch (error) {
         console.error('Error al cargar cultivos:', error);
-        // Mensaje actualizado para el despliegue en la nube
         loadingMessage.textContent = `❌ ERROR DE CONEXIÓN: ${error.message}. Verifica que la URL de Fly.io sea correcta.`;
         loadingMessage.style.color = 'var(--color-danger)';
     }
@@ -51,31 +176,31 @@ async function cargarCultivos() {
  */
 async function manejarEnvioFormulario(event) {
     event.preventDefault(); 
+    // ⚠️ REVISIÓN: Bloquear si no está autenticado
+    if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para realizar cambios.');
+
 
     const datosCultivo = obtenerDatosFormulario();
 
-    // 🚩 CORRECCIÓN CRÍTICA 1: Usar los campos del Frontend para la validación local
+    // 🚩 Validación de campos (conservado)
     if (!datosCultivo.nombre || !datosCultivo.fecha_siembra || !datosCultivo.fecha_cosecha) {
         alert('Por favor, rellena el nombre, la fecha de siembra y la fecha de cosecha.');
         return;
     }
     
-    // VALIDACIÓN DE FECHAS (Frontend)
+    // VALIDACIÓN DE FECHAS (conservado)
     if (!validarFechas(datosCultivo.fecha_siembra, datosCultivo.fecha_cosecha)) {
         alert('❌ Error: La fecha de cosecha no puede ser anterior a la fecha de siembra.');
         return; 
     }
 
-    // Usaremos el ID único del Backend para PUT, no el nombre original
     const idOriginal = originalNameInput.value; 
     let url = API_BASE_URL;
     let method = 'POST';
     
     if (modoEdicion) {
-        // 🚩 CORRECCIÓN CRÍTICA 2: El Backend usa el ID para DELETE/PUT
         url = `${API_BASE_URL}/${idOriginal}`; 
         method = 'PUT';
-        // Incluir el ID en los datos enviados para la actualización
         datosCultivo.id = idOriginal; 
     }
 
@@ -95,7 +220,6 @@ async function manejarEnvioFormulario(event) {
             resetFormulario();
             cargarCultivos(); 
         } else {
-            // Esto capturará el error "Faltan campos requeridos" que viene del Backend
             alert(`Error ${response.status}: ${resultado.error || 'Algo salió mal en el servidor.'}`);
         }
     } catch (error) {
@@ -108,7 +232,9 @@ async function manejarEnvioFormulario(event) {
  * 3. DELETE (Eliminar): Elimina un cultivo por su ID.
  */
 async function eliminarCultivo(idCultivo) {
-    // Buscar el nombre para la confirmación visual
+    // ⚠️ REVISIÓN: Bloquear si no está autenticado
+    if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para eliminar.');
+
     const cultivo = cultivosData.find(c => c.id === idCultivo);
     const nombreCultivo = cultivo ? cultivo.nombre : 'este cultivo';
     
@@ -116,7 +242,6 @@ async function eliminarCultivo(idCultivo) {
         return;
     }
 
-    // 🚩 CORRECCIÓN CRÍTICA 3: El Backend usa el ID, no el nombre, para la eliminación
     try {
         const response = await fetch(`${API_BASE_URL}/${idCultivo}`, { 
             method: 'DELETE',
@@ -136,9 +261,9 @@ async function eliminarCultivo(idCultivo) {
     }
 }
 
-/**
- * 4. FILTRAR: Filtra los cultivos mostrados en la tabla basándose en el texto de búsqueda.
- */
+
+// --- 3. FUNCIONES DE UTILIDAD Y RENDERIZADO (EXISTENTES) ---
+
 function filtrarCultivos() {
     const textoBusqueda = searchInput.value.toLowerCase().trim();
     
@@ -161,9 +286,6 @@ function filtrarCultivos() {
     renderizarTabla(cultivosFiltrados);
 }
 
-/**
- * 5. KPIs: Calcula y actualiza los KPIs financieros.
- */
 function actualizarKpis(cultivos) {
     let costoTotal = 0;
     let ventaTotal = 0;
@@ -175,22 +297,14 @@ function actualizarKpis(cultivos) {
     
     const gananciaPotencial = ventaTotal - costoTotal;
 
-    // Actualizar los elementos del DOM
     document.getElementById('kpiCosto').textContent = `€${costoTotal.toFixed(2)}`;
     document.getElementById('kpiVenta').textContent = `€${ventaTotal.toFixed(2)}`;
     document.getElementById('kpiGanancia').textContent = `€${gananciaPotencial.toFixed(2)}`;
     
-    // Estilo condicional para la ganancia
     const gananciaElement = document.getElementById('kpiGanancia');
     gananciaElement.style.color = gananciaPotencial >= 0 ? 'var(--color-primary)' : 'var(--color-danger)';
 }
 
-
-// --- FUNCIONES DE UTILIDAD Y RENDERIZADO ---
-
-/**
- * Valida que la fecha de cosecha sea posterior o igual a la fecha de siembra.
- */
 function validarFechas(siembraStr, cosechaStr) {
     const siembra = Date.parse(siembraStr);
     const cosecha = Date.parse(cosechaStr);
@@ -201,9 +315,6 @@ function validarFechas(siembraStr, cosechaStr) {
     return true;
 }
 
-/**
- * Recopila los datos del formulario.
- */
 function obtenerDatosFormulario() {
     return {
         nombre: document.getElementById('nombre').value.trim(),
@@ -217,9 +328,6 @@ function obtenerDatosFormulario() {
     };
 }
 
-/**
- * Pinta la tabla HTML con los datos pasados.
- */
 function renderizarTabla(cultivos) {
     tableBody.innerHTML = '';
     
@@ -237,14 +345,12 @@ function renderizarTabla(cultivos) {
         let claseCosecha = 'cosecha-futura';
         let isAlert = false;
         
-        // Clases para estado de cosecha
         if (cultivo.dias_restantes && cultivo.dias_restantes.includes('COSECHA HOY')) {
             claseCosecha = 'cosecha-hoy';
         } else if (cultivo.dias_restantes && cultivo.dias_restantes.includes('Cosechado hace')) {
             claseCosecha = 'cosecha-pasada';
         }
         
-        // LÓGICA DE ALERTA DE PROXIMIDAD
         const dias = parseInt(cultivo.dias_restantes);
         if (!isNaN(dias) && dias > 0 && dias <= cultivo.dias_alerta) {
             isAlert = true;
@@ -252,7 +358,6 @@ function renderizarTabla(cultivos) {
         
         const margen = (cultivo.precio_venta - cultivo.precio_compra).toFixed(2);
         
-        // Renderizado de celdas
         row.insertCell().textContent = cultivo.nombre;
         row.insertCell().textContent = cultivo.zona;
         row.insertCell().textContent = cultivo.fecha_siembra;
@@ -264,25 +369,21 @@ function renderizarTabla(cultivos) {
         
         row.insertCell().textContent = `€${margen}`;
 
-        // Aplicar clase de alerta a la fila
         if (isAlert) {
             row.classList.add('fila-alerta');
         }
 
-        // Celda de Acciones (Botones)
         const cellAcciones = row.insertCell();
         cellAcciones.classList.add('action-buttons');
         
         const btnEditar = document.createElement('button');
         btnEditar.textContent = 'Editar';
         btnEditar.classList.add('edit-btn');
-        // 🚩 CAMBIO: Pasamos el objeto completo (que incluye el ID)
         btnEditar.onclick = () => cargarParaEdicion(cultivo); 
         
         const btnEliminar = document.createElement('button');
         btnEliminar.textContent = 'Eliminar';
         btnEliminar.classList.add('delete-btn');
-        // 🚩 CAMBIO: Pasamos el ID del cultivo para la eliminación
         btnEliminar.onclick = () => eliminarCultivo(cultivo.id); 
         
         cellAcciones.appendChild(btnEditar);
@@ -290,10 +391,10 @@ function renderizarTabla(cultivos) {
     });
 }
 
-/**
- * Carga los datos de un cultivo seleccionado al formulario para su edición.
- */
 function cargarParaEdicion(cultivo) {
+    // ⚠️ REVISIÓN: Bloquear si no está autenticado
+    if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para editar.');
+    
     // 1. Cargar datos al formulario
     document.getElementById('nombre').value = cultivo.nombre;
     document.getElementById('zona').value = cultivo.zona;
@@ -306,7 +407,6 @@ function cargarParaEdicion(cultivo) {
     
     // 2. Configurar el modo edición
     modoEdicion = true;
-    // 🚩 CAMBIO: Guardamos el ID del cultivo para usarlo en la llamada PUT/DELETE
     originalNameInput.value = cultivo.id; 
     submitButton.textContent = `Guardar Cambios de ${cultivo.nombre}`;
     submitButton.classList.add('edit-btn');
@@ -315,9 +415,6 @@ function cargarParaEdicion(cultivo) {
     document.getElementById('form-section').scrollIntoView({ behavior: 'smooth' });
 }
 
-/**
- * Limpia el formulario y vuelve al modo Añadir.
- */
 function resetFormulario() {
     form.reset();
     modoEdicion = false;
@@ -332,18 +429,28 @@ function resetFormulario() {
 }
 
 
-// --- INICIALIZACIÓN ---
+// --- 4. INICIALIZACIÓN DE EVENTOS (MODIFICADA) ---
 
-form.addEventListener('submit', manejarEnvioFormulario);
-searchInput.addEventListener('input', filtrarCultivos); 
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Mostrar la interfaz de autenticación al inicio
+    toggleInterface(false); 
+    
+    // 2. Event Listeners para Autenticación
+    loginForm.addEventListener('submit', manejarLogin);
+    registroForm.addEventListener('submit', manejarRegistro);
+    logoutButton.addEventListener('click', cerrarSesion);
 
-// Botón de Cancelar Edición
-const btnCancelar = document.createElement('button');
-btnCancelar.textContent = 'Limpiar / Cancelar Edición';
-btnCancelar.classList.add('delete-btn');
-btnCancelar.type = 'button'; 
-btnCancelar.onclick = resetFormulario;
-form.appendChild(btnCancelar);
+    // 3. Event Listeners para CRUD (dentro del Dashboard)
+    form.addEventListener('submit', manejarEnvioFormulario);
+    searchInput.addEventListener('input', filtrarCultivos); 
 
-// Carga los cultivos al iniciar la página
-document.addEventListener('DOMContentLoaded', cargarCultivos);
+    // Botón de Cancelar Edición (Se mantiene la lógica de inyección)
+    const btnCancelar = document.createElement('button');
+    btnCancelar.textContent = 'Limpiar / Cancelar Edición';
+    btnCancelar.classList.add('delete-btn');
+    btnCancelar.type = 'button'; 
+    btnCancelar.onclick = resetFormulario;
+    form.appendChild(btnCancelar);
+
+    // NOTA: La función cargarCultivos() se llama ahora SOLO al iniciar sesión con éxito.
+});

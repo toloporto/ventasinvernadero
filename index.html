@@ -3,91 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Cultivos (Web API)</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Gestor de Cultivos - Invernadero</title>
+    <link rel="stylesheet" href="styles.css"> <style>
+        /* Estilos básicos para la autenticación (puedes moverlos a styles.css) */
+        #auth-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        #auth-container h3 {
+            margin-top: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        #dashboard-container {
+            /* Estilos de tu dashboard principal */
+            padding: 20px;
+        }
+    </style>
 </head>
 <body>
 
-    <header>
-        <h1>🌱 Gestor de Cultivos API</h1>
-    </header>
-
-    <main>
-        <section id="resumen-financiero" class="card">
-            <h2>📊 Resumen Financiero Estimado</h2>
-            <div class="kpis">
-                <div class="kpi-item">
-                    <h3>Costo Total</h3>
-                    <p id="kpiCosto">€0.00</p>
-                </div>
-                <div class="kpi-item">
-                    <h3>Venta Total Estimada</h3>
-                    <p id="kpiVenta">€0.00</p>
-                </div>
-                <div class="kpi-item profit">
-                    <h3>Ganancia Potencial</h3>
-                    <p id="kpiGanancia">€0.00</p>
-                </div>
-            </div>
-        </section>
+    <div id="auth-container">
+        <h2>Bienvenido/a al Gestor de Cultivos</h2>
         
-        <section class="card" id="form-section">
-            <h2>✏️ Añadir / Editar Cultivo</h2>
-            <form id="cultivoForm">
-                <input type="hidden" id="cultivoNombreOriginal" value="">
-                
-                <label for="nombre">Nombre:</label>
-                <input type="text" id="nombre" required>
-
-                <label for="zona">Zona:</label>
-                <input type="text" id="zona">
-
-                <label for="fecha_siembra">Fecha Siembra:</label>
-                <input type="date" id="fecha_siembra" required>
-
-                <label for="fecha_cosecha">Fecha Cosecha:</label>
-                <input type="date" id="fecha_cosecha" required>
-
-                <div class="split">
-                    <div>
-                        <label for="precio_compra">Costo (€):</label>
-                        <input type="number" id="precio_compra" step="0.01" value="0.00">
-                    </div>
-                    <div>
-                        <label for="precio_venta">Venta Est. (€):</label>
-                        <input type="number" id="precio_venta" step="0.01" value="0.00">
-                    </div>
+        <section class="form-section">
+            <h3>Iniciar Sesión</h3>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-usuario">Usuario:</label>
+                    <input type="text" id="login-usuario" required>
                 </div>
-                
-                <label for="dias_alerta">Días de Alerta (Previos a Cosecha):</label>
-                <input type="number" id="dias_alerta" value="7">
-
-                <label for="notas">Notas:</label>
-                <textarea id="notas"></textarea>
-
-                <button type="submit" id="submitButton">Añadir Cultivo</button>
+                <div class="form-group">
+                    <label for="login-contraseña">Contraseña:</label>
+                    <input type="password" id="login-contraseña" required>
+                </div>
+                <button type="submit" id="login-button">Acceder</button>
             </form>
         </section>
 
-        <section class="card" id="list-section">
-            <h2>🗓 Mis Cultivos</h2>
-            
-            <div id="search-container">
-                <label for="cultivoSearch">🔍 Buscar Cultivo:</label>
-                <input type="text" id="cultivoSearch" placeholder="Escribe nombre, zona o nota para filtrar...">
+        <hr>
+
+        <section class="form-section">
+            <h3>Registrarse (Primer Uso)</h3>
+            <form id="registro-form">
+                <div class="form-group">
+                    <label for="registro-usuario">Usuario:</label>
+                    <input type="text" id="registro-usuario" required>
+                </div>
+                <div class="form-group">
+                    <label for="registro-contraseña">Contraseña:</label>
+                    <input type="password" id="registro-contraseña" required>
+                </div>
+                <button type="submit" id="registro-button">Registrarme</button>
+            </form>
+        </section>
+        <p id="auth-message" style="margin-top: 10px;"></p>
+    </div>
+    
+    <div id="dashboard-container" style="display: none;">
+        
+        <header>
+            <h1>Gestión de Cultivos en Invernadero</h1>
+            <button id="logout-button" style="float: right; margin-top: -40px;">Cerrar Sesión</button>
+        </header>
+
+        <section class="kpi-section">
+            <h2>Indicadores Clave de Rendimiento</h2>
+            <div class="kpi-cards">
+                <div class="kpi-card">
+                    <h3>Costo Total Invertido</h3>
+                    <p id="kpiCosto">€0.00</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>Venta Potencial Estimada</h3>
+                    <p id="kpiVenta">€0.00</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>Ganancia Potencial</h3>
+                    <p id="kpiGanancia" style="color: var(--color-primary);">€0.00</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section" id="form-section">
+            <h2>Añadir o Editar Cultivo</h2>
+            <form id="cultivoForm">
+                <input type="hidden" id="cultivoNombreOriginal">
+                
+                <div class="form-group">
+                    <label for="nombre">Nombre del Cultivo:</label>
+                    <input type="text" id="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label for="zona">Zona / Lote:</label>
+                    <input type="text" id="zona" required>
+                </div>
+                
+                <div class="form-group-inline">
+                    <div class="form-group">
+                        <label for="fecha_siembra">Fecha de Siembra:</label>
+                        <input type="date" id="fecha_siembra" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_cosecha">Fecha de Cosecha (Estimada):</label>
+                        <input type="date" id="fecha_cosecha" required>
+                    </div>
+                </div>
+
+                <div class="form-group-inline">
+                    <div class="form-group">
+                        <label for="precio_compra">Costo Inversión (€):</label>
+                        <input type="number" id="precio_compra" value="0.00" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="precio_venta">Precio Venta Est. (€):</label>
+                        <input type="number" id="precio_venta" value="0.00" step="0.01" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="dias_alerta">Días para Alerta de Cosecha:</label>
+                    <input type="number" id="dias_alerta" value="7" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notas">Notas:</label>
+                    <textarea id="notas"></textarea>
+                </div>
+                
+                <button type="submit" id="submitButton">Añadir Cultivo</button>
+                </form>
+        </section>
+
+        <section class="list-section">
+            <h2>Listado de Cultivos</h2>
+            <div class="search-bar">
+                <input type="text" id="cultivoSearch" placeholder="Buscar por nombre, zona o notas...">
+                <span id="loading-message"></span>
             </div>
             
-            <p id="loading-message">Cargando datos de la API...</p>
-
-            <table id="cultivoTable">
+            <table class="cultivo-table">
                 <thead>
                     <tr>
                         <th>Nombre</th>
                         <th>Zona</th>
                         <th>Siembra</th>
-                        <th>Cosecha</th>
-                        <th>Faltan</th>
-                        <th>Margen Est.</th>
+                        <th>Cosecha Est.</th>
+                        <th>Faltan (Días)</th>
+                        <th>Margen (€)</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -95,12 +163,7 @@
                     </tbody>
             </table>
         </section>
-    </main>
 
-    <footer>
-        <p>&copy; 2025 Asistente de Cultivos Web API</p>
-    </footer>
-
-    <script src="scripts.js"></script>
+    </div> <script src="scripts.js"></script>
 </body>
 </html>

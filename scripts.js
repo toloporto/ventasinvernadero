@@ -5,7 +5,8 @@ const API_BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/api/v1/cultiv
 const tableBody = document.getElementById('cultivoList');
 const form = document.getElementById('cultivoForm');
 const submitButton = document.getElementById('submitButton');
-const originalNameInput = document.getElementById('cultivoNombreOriginal');
+// Campo para guardar el ID o Nombre Original (lo usaremos para identificar la edición)
+const originalNameInput = document.getElementById('cultivoNombreOriginal'); 
 const loadingMessage = document.getElementById('loading-message');
 const searchInput = document.getElementById('cultivoSearch'); 
 
@@ -21,6 +22,13 @@ async function cargarCultivos() {
     loadingMessage.textContent = 'Cargando datos de la API...';
     try {
         const response = await fetch(API_BASE_URL);
+        
+        if (!response.ok) {
+            // Manejar errores de la API (500, 404 de API, etc.)
+            const errorText = await response.text();
+            throw new Error(`Error de la API: ${response.status} - ${errorText}`);
+        }
+        
         const cultivos = await response.json();
         
         cultivosData = cultivos; 
@@ -32,7 +40,8 @@ async function cargarCultivos() {
 
     } catch (error) {
         console.error('Error al cargar cultivos:', error);
-        loadingMessage.textContent = 'ERROR: No se pudo conectar con el servidor Flask. Asegúrate de que esté corriendo en http://127.0.0.1:5000.';
+        // Mensaje actualizado para el despliegue en la nube
+        loadingMessage.textContent = `❌ ERROR DE CONEXIÓN: ${error.message}. Verifica que la URL de Fly.io sea correcta.`;
         loadingMessage.style.color = 'var(--color-danger)';
     }
 }
@@ -45,6 +54,7 @@ async function manejarEnvioFormulario(event) {
 
     const datosCultivo = obtenerDatosFormulario();
 
+    // 🚩 CORRECCIÓN CRÍTICA 1: Usar los campos del Frontend para la validación local
     if (!datosCultivo.nombre || !datosCultivo.fecha_siembra || !datosCultivo.fecha_cosecha) {
         alert('Por favor, rellena el nombre, la fecha de siembra y la fecha de cosecha.');
         return;
@@ -56,13 +66,17 @@ async function manejarEnvioFormulario(event) {
         return; 
     }
 
-    const nombreOriginal = originalNameInput.value;
+    // Usaremos el ID único del Backend para PUT, no el nombre original
+    const idOriginal = originalNameInput.value; 
     let url = API_BASE_URL;
     let method = 'POST';
     
     if (modoEdicion) {
-        url = `${API_BASE_URL}/${nombreOriginal}`;
+        // 🚩 CORRECCIÓN CRÍTICA 2: El Backend usa el ID para DELETE/PUT
+        url = `${API_BASE_URL}/${idOriginal}`; 
         method = 'PUT';
+        // Incluir el ID en los datos enviados para la actualización
+        datosCultivo.id = idOriginal; 
     }
 
     try {
@@ -81,24 +95,30 @@ async function manejarEnvioFormulario(event) {
             resetFormulario();
             cargarCultivos(); 
         } else {
+            // Esto capturará el error "Faltan campos requeridos" que viene del Backend
             alert(`Error ${response.status}: ${resultado.error || 'Algo salió mal en el servidor.'}`);
         }
     } catch (error) {
         console.error('Error al enviar el formulario:', error);
-        alert('Error de conexión con la API.');
+        alert('Error de conexión con la API. Asegúrate de que Fly.io esté funcionando.');
     }
 }
 
 /**
- * 3. DELETE (Eliminar): Elimina un cultivo por nombre.
+ * 3. DELETE (Eliminar): Elimina un cultivo por su ID.
  */
-async function eliminarCultivo(nombreCultivo) {
+async function eliminarCultivo(idCultivo) {
+    // Buscar el nombre para la confirmación visual
+    const cultivo = cultivosData.find(c => c.id === idCultivo);
+    const nombreCultivo = cultivo ? cultivo.nombre : 'este cultivo';
+    
     if (!confirm(`¿Estás seguro de que deseas eliminar el cultivo: ${nombreCultivo}?`)) {
         return;
     }
 
+    // 🚩 CORRECCIÓN CRÍTICA 3: El Backend usa el ID, no el nombre, para la eliminación
     try {
-        const response = await fetch(`${API_BASE_URL}/${nombreCultivo}`, {
+        const response = await fetch(`${API_BASE_URL}/${idCultivo}`, { 
             method: 'DELETE',
         });
 
@@ -256,12 +276,14 @@ function renderizarTabla(cultivos) {
         const btnEditar = document.createElement('button');
         btnEditar.textContent = 'Editar';
         btnEditar.classList.add('edit-btn');
-        btnEditar.onclick = () => cargarParaEdicion(cultivo);
+        // 🚩 CAMBIO: Pasamos el objeto completo (que incluye el ID)
+        btnEditar.onclick = () => cargarParaEdicion(cultivo); 
         
         const btnEliminar = document.createElement('button');
         btnEliminar.textContent = 'Eliminar';
         btnEliminar.classList.add('delete-btn');
-        btnEliminar.onclick = () => eliminarCultivo(cultivo.nombre);
+        // 🚩 CAMBIO: Pasamos el ID del cultivo para la eliminación
+        btnEliminar.onclick = () => eliminarCultivo(cultivo.id); 
         
         cellAcciones.appendChild(btnEditar);
         cellAcciones.appendChild(btnEliminar);
@@ -284,7 +306,8 @@ function cargarParaEdicion(cultivo) {
     
     // 2. Configurar el modo edición
     modoEdicion = true;
-    originalNameInput.value = cultivo.nombre; 
+    // 🚩 CAMBIO: Guardamos el ID del cultivo para usarlo en la llamada PUT/DELETE
+    originalNameInput.value = cultivo.id; 
     submitButton.textContent = `Guardar Cambios de ${cultivo.nombre}`;
     submitButton.classList.add('edit-btn');
     submitButton.classList.remove('delete-btn');

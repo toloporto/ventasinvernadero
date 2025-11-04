@@ -1,7 +1,7 @@
 // scripts.js
 
 // --- CONFIGURACIÓN ---
-const API_BASE_URL = 'http://127.0.0.1:5000/api/v1/cultivos';
+const API_BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/api/v1/cultivos';
 const tableBody = document.getElementById('cultivoList');
 const form = document.getElementById('cultivoForm');
 const submitButton = document.getElementById('submitButton');

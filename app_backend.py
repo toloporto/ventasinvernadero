@@ -67,9 +67,11 @@ def agregar_cultivo():
     """POST: Agrega un nuevo cultivo."""
     try:
         data = request.get_json()
-        if not all(k in data for k in ('nombre', 'tipo', 'fecha_plantacion')):
-            return jsonify({"error": "Faltan campos requeridos"}), 400
-
+        #if not all(k in data for k in ('nombre', 'tipo', 'fecha_plantacion')):
+            #return jsonify({"error": "Faltan campos requeridos"}), 400
+        # Validar los campos esenciales de tu formulario
+        if not all(k in data for k in ('nombre', 'fecha_siembra', 'fecha_cosecha')):
+            return jsonify({"error": "Faltan campos requeridos (nombre, fecha_siembra, fecha_cosecha)"}), 400
         # Validación básica de existencia (opcional, si el frontend no valida)
         if any(c['nombre'] == data['nombre'] for c in CULTIVOS):
             return jsonify({"error": "El cultivo ya existe."}), 409

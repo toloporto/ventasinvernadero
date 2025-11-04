@@ -12,3 +12,7 @@ primary_region = "cdg" # O tu región elegida
   auto_start_machines = true
   min_machines_running = 0
   processes = ["app"]
+
+[mounts]
+source="data_ventas"
+destination="/vol/data"

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Cultivos (Web API)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <header>
+        <h1>🌱 Gestor de Cultivos API</h1>
+    </header>
+
+    <main>
+        <section id="resumen-financiero" class="card">
+            <h2>📊 Resumen Financiero Estimado</h2>
+            <div class="kpis">
+                <div class="kpi-item">
+                    <h3>Costo Total</h3>
+                    <p id="kpiCosto">€0.00</p>
+                </div>
+                <div class="kpi-item">
+                    <h3>Venta Total Estimada</h3>
+                    <p id="kpiVenta">€0.00</p>
+                </div>
+                <div class="kpi-item profit">
+                    <h3>Ganancia Potencial</h3>
+                    <p id="kpiGanancia">€0.00</p>
+                </div>
+            </div>
+        </section>
+        
+        <section class="card" id="form-section">
+            <h2>✏️ Añadir / Editar Cultivo</h2>
+            <form id="cultivoForm">
+                <input type="hidden" id="cultivoNombreOriginal" value="">
+                
+                <label for="nombre">Nombre:</label>
+                <input type="text" id="nombre" required>
+
+                <label for="zona">Zona:</label>
+                <input type="text" id="zona">
+
+                <label for="fecha_siembra">Fecha Siembra:</label>
+                <input type="date" id="fecha_siembra" required>
+
+                <label for="fecha_cosecha">Fecha Cosecha:</label>
+                <input type="date" id="fecha_cosecha" required>
+
+                <div class="split">
+                    <div>
+                        <label for="precio_compra">Costo (€):</label>
+                        <input type="number" id="precio_compra" step="0.01" value="0.00">
+                    </div>
+                    <div>
+                        <label for="precio_venta">Venta Est. (€):</label>
+                        <input type="number" id="precio_venta" step="0.01" value="0.00">
+                    </div>
+                </div>
+                
+                <label for="dias_alerta">Días de Alerta (Previos a Cosecha):</label>
+                <input type="number" id="dias_alerta" value="7">
+
+                <label for="notas">Notas:</label>
+                <textarea id="notas"></textarea>
+
+                <button type="submit" id="submitButton">Añadir Cultivo</button>
+            </form>
+        </section>
+
+        <section class="card" id="list-section">
+            <h2>🗓 Mis Cultivos</h2>
+            
+            <div id="search-container">
+                <label for="cultivoSearch">🔍 Buscar Cultivo:</label>
+                <input type="text" id="cultivoSearch" placeholder="Escribe nombre, zona o nota para filtrar...">
+            </div>
+            
+            <p id="loading-message">Cargando datos de la API...</p>
+
+            <table id="cultivoTable">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Zona</th>
+                        <th>Siembra</th>
+                        <th>Cosecha</th>
+                        <th>Faltan</th>
+                        <th>Margen Est.</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="cultivoList">
+                    </tbody>
+            </table>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Asistente de Cultivos Web API</p>
+    </footer>
+
+    <script src="scripts.js"></script>
+</body>
+</html>

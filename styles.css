@@ -1,0 +1,286 @@
+/* styles.css */
+
+:root {
+    --color-dark-bg: #1e1e1e;
+    --color-card-bg: #2d2d2d;
+    --color-text: #f0f0f0;
+    --color-primary: #5cb85c; /* Verde (Ganancia) */
+    --color-secondary: #007bff; /* Azul (Título) */
+    --color-danger: #dc3545; /* Rojo (Pérdida/Eliminar) */
+    --color-alert: #ffc107; /* Amarillo (Alerta/Cosecha Hoy) */
+}
+
+/* Estilos Generales */
+body {
+    font-family: Arial, sans-serif;
+    background-color: var(--color-dark-bg);
+    color: var(--color-text);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+header {
+    background-color: var(--color-card-bg);
+    width: 100%;
+    text-align: center;
+    padding: 20px 0;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+    color: var(--color-primary);
+    margin: 0;
+}
+
+main {
+    display: flex;
+    flex-wrap: wrap; 
+    gap: 20px;
+    max-width: 1200px;
+    width: 90%;
+    padding-bottom: 40px;
+}
+
+/* Estilos de las Tarjetas (Card) */
+.card {
+    background-color: var(--color-card-bg);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    flex-grow: 1;
+}
+
+/* Distribución del contenido */
+#form-section {
+    flex-basis: 300px;
+    flex-shrink: 0;
+}
+
+#list-section {
+    flex-basis: 0; 
+    flex-grow: 1; 
+    overflow-x: auto;
+}
+
+h2 {
+    color: var(--color-secondary);
+    border-bottom: 2px solid var(--color-card-bg);
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+
+/* --- Resumen Financiero --- */
+#resumen-financiero {
+    width: 100%;
+    margin-bottom: 0; 
+    padding: 15px 20px;
+    order: -1; 
+    flex-basis: 100%;
+}
+
+#resumen-financiero h2 {
+    border-bottom: none;
+    margin-bottom: 15px;
+}
+
+.kpis {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+    text-align: center;
+}
+
+.kpi-item {
+    background-color: #383838;
+    padding: 10px 15px;
+    border-radius: 6px;
+    flex-grow: 1;
+    border-left: 5px solid #444; 
+}
+.kpi-item:nth-child(1) { border-left-color: #f88; } 
+.kpi-item:nth-child(2) { border-left-color: var(--color-secondary); } 
+
+.kpi-item h3 {
+    margin: 0 0 5px 0;
+    font-size: 0.9em;
+    color: #ccc;
+}
+
+.kpi-item p {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+.profit {
+    border-left-color: var(--color-primary); 
+}
+
+/* --- Refinamiento Visual para dispositivos grandes --- */
+@media (min-width: 768px) {
+    .kpi-item p {
+        font-size: 2em;
+    }
+    .kpi-item h3 {
+        font-size: 1em;
+    }
+}
+
+/* Estilos del Formulario */
+form label {
+    display: block;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+form input[type="text"],
+form input[type="date"],
+form input[type="number"],
+form textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 1px solid #444;
+    background-color: #383838;
+    color: var(--color-text);
+    border-radius: 4px;
+}
+
+.split {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.split > div {
+    flex-basis: 50%;
+}
+
+button {
+    background-color: var(--color-primary);
+    color: var(--color-text);
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+button:hover {
+    background-color: #4CAF50;
+}
+
+/* Estilos de la Tabla */
+#cultivoTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+#cultivoTable th, #cultivoTable td {
+    border: 1px solid #444;
+    padding: 10px;
+    text-align: left;
+    white-space: nowrap; 
+}
+
+#cultivoTable th {
+    background-color: #495057;
+    color: var(--color-text);
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Clases de color para el estado de la cosecha */
+.cosecha-pasada {
+    background-color: #444;
+    color: #aaa;
+}
+.cosecha-hoy {
+    background-color: var(--color-alert);
+    color: var(--color-dark-bg);
+    font-weight: bold;
+}
+.cosecha-futura {
+    background-color: #383838;
+}
+
+/* --- MEJORA 4: Alerta de Proximidad Visual --- */
+.fila-alerta {
+    animation: pulse-alert 1.5s infinite alternate; 
+    background-color: rgba(255, 193, 7, 0.1); 
+}
+
+/* Animación de pulsación sutil */
+@keyframes pulse-alert {
+    from {
+        box-shadow: 0 0 0px var(--color-alert);
+    }
+    to {
+        box-shadow: 0 0 5px var(--color-alert);
+    }
+}
+
+/* Refinamiento: Cursor pointer para filas y hover */
+#cultivoList tr {
+    cursor: pointer;
+}
+#cultivoList tr:hover {
+    background-color: #353535; 
+}
+
+
+/* Botones de acción dentro de la tabla */
+.action-buttons button {
+    margin: 0 5px;
+    padding: 5px 8px;
+    font-size: 0.8em;
+    margin-top: 0;
+}
+
+.edit-btn {
+    background-color: var(--color-secondary);
+}
+.delete-btn {
+    background-color: var(--color-danger);
+}
+.edit-btn:hover {
+    background-color: #0056b3;
+}
+.delete-btn:hover {
+    background-color: #c82333;
+}
+
+/* Footer */
+footer {
+    width: 100%;
+    text-align: center;
+    padding: 10px 0;
+    background-color: var(--color-card-bg);
+    color: #888;
+    margin-top: auto; 
+}
+
+/* Estilos de Búsqueda */
+#search-container {
+    padding: 10px 0;
+    border-top: 1px solid #444;
+}
+
+#cultivoSearch {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 1px solid #555;
+    background-color: #383838;
+    color: var(--color-text);
+    border-radius: 4px;
+}

@@ -16,4 +16,4 @@ COPY cultivos.json .
 # COPY app_frontend/ ./app_frontend/  # Aseguramos que la carpeta del frontend también se copie
 
 # El comando para iniciar el servidor (usa Gunicorn)
-CMD gunicorn app_backend:app --bind 0.0.0.0:$PORT
+CMD gunicorn app_backend:app --bind 0.0.0.0:8080

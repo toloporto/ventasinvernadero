@@ -1,6 +1,6 @@
 # fly.toml
 app = "nombre-unico-de-tu-api-flask" # <--- ¡VERIFICA QUE SEA ÚNICO!
-primary_region = "mad" # O tu región elegida
+primary_region = "cdg" # O tu región elegida
 
 [build]
 # La ausencia de 'builder' fuerza el uso del Dockerfile

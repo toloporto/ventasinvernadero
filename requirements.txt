@@ -1,1 +1,11 @@
-Flask==3.0.3gunicorn==21.2.0python-dateutil==2.9.0.post0Werkzeug==3.0.3itsdangerous==2.1.2Jinja2==3.1.4click==8.1.7MarkupSafe==2.1.5# Asegúrate de que solo las dependencias de Flask y gunicorn estén aquí.# ¡Sin llama_stack ni librerías de IA/análisis si no las usas!
+Flask==3.0.3
+gunicorn==21.2.0
+python-dateutil==2.9.0.post0
+Flask-Cors==4.0.1
+Werkzeug==3.0.3
+itsdangerous==2.1.2
+Jinja2==3.1.4
+click==8.1.7
+MarkupSafe==2.1.5
+# Asegúrate de que solo las dependencias de Flask y gunicorn estén aquí.
+# ¡Sin llama_stack ni librerías de IA/análisis si no las usas!

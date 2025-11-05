@@ -188,12 +188,12 @@ def login():
 
             # 4. Configuramos la Cookie Segura
             response.set_cookie(
-                'session_token',              # Nombre de la cookie
-                token_valor,                  # Valor (el ID de usuario)
-                httponly=True,                # Impide acceso desde JS (SEGURIDAD)
-                secure=True,                  # Solo se envía a través de HTTPS (SEGURIDAD)
-                samesite='Lax',               # Funciona bien en peticiones CORS
-                max_age=3600 * 24 * 7         # Caducidad: 7 días
+                'session_token',              # Nombre de la cookie
+                token_valor,                  # Valor (el ID de usuario)
+                httponly=True,                # Impide acceso desde JS (SEGURIDAD)
+                secure=True,                  # Solo se envía a través de HTTPS (SEGURIDAD)
+                samesite='Lax',               # Funciona bien en peticiones CORS
+                max_age=3600 * 24 * 7         # Caducidad: 7 días
             )
             
             return response # Devolvemos la respuesta con la cookie configurada

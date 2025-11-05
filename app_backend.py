@@ -13,10 +13,9 @@ RUTA_DATOS_CULTIVOS = '/vol/data/cultivos.json'
 RUTA_DATOS_USUARIOS = '/vol/data/usuarios.json' 
 
 app = Flask(__name__)
-# 🚩 CORRECCIÓN CORS: Configuración para permitir el envío de credenciales/cookies
-# El parámetro supports_credentials=True es necesario para que el Frontend pueda enviar y recibir cookies.
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}, "supports_credentials": True}) # <-- MODIFICADO
-
+# 🚩 CONFIGURACIÓN CORS: IMPRESCINDIBLE para enviar/recibir cookies entre Frontend y Backend.
+# app_backend.py
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, supports_credentials=True)
 # Variables globales para los datos
 CULTIVOS = [] 
 USUARIOS = [] 
@@ -116,7 +115,7 @@ def token_requerido(f):
             # Token inválido o ID de usuario no existe
             return jsonify({'error': 'Token inválido o sesión expirada'}), 401
         
-        # Guardamos el usuario para usarlo si es necesario (ej: si se necesita el ID de usuario)
+        # Guardamos el usuario para usarlo si es necesario
         request.current_user = usuario_actual 
         
         # Continuar con la función de la ruta original
@@ -141,7 +140,7 @@ def registro():
 
     # 1. Verificar si el usuario ya existe
     if any(u['usuario'] == usuario for u in USUARIOS):
-        return jsonify({"error": "El usuario ya existe"}), 409 # 409 Conflict
+        return jsonify({"error": "El usuario ya existe"}), 409 
 
     # 2. Hashear la contraseña (Seguridad)
     hashed_password = generate_password_hash(contraseña)
@@ -185,8 +184,8 @@ def login():
             response.set_cookie(
                 'session_token',              # Nombre de la cookie
                 token_valor,                  # Valor (el ID de usuario)
-                httponly=True,                # Impide acceso desde JS
-                secure=True,                  # Solo se envía a través de HTTPS (necesario en Fly.io)
+                httponly=True,                # Impide acceso desde JS (SEGURIDAD)
+                secure=True,                  # Solo se envía a través de HTTPS (SEGURIDAD)
                 samesite='Lax',               # Funciona bien en peticiones CORS
                 max_age=3600 * 24 * 7         # Caducidad: 7 días
             )
@@ -207,7 +206,6 @@ def login():
 @token_requerido # <-- PROTEGIDA
 def listar_cultivos():
     """GET: Lista todos los cultivos."""
-    # Opcional: Si los cultivos fueran por usuario, usaríamos request.current_user['id']
     return jsonify(CULTIVOS)
 
 @app.route('/api/v1/cultivos', methods=['POST'])
@@ -233,7 +231,7 @@ def agregar_cultivo():
     except Exception as e:
         return jsonify({"error": f"Error interno al agregar: {str(e)}"}), 500
 
-@app.route('/api/v1/cultivos/<id_cultivo>', methods=['PUT']) # <-- Ruta PUT añadida/confirmada
+@app.route('/api/v1/cultivos/<id_cultivo>', methods=['PUT']) 
 @token_requerido # <-- PROTEGIDA
 def actualizar_cultivo(id_cultivo):
     """PUT: Actualiza un cultivo existente."""

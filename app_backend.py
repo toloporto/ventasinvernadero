@@ -14,14 +14,15 @@ RUTA_DATOS_CULTIVOS = '/vol/data/cultivos.json'
 RUTA_DATOS_USUARIOS = '/vol/data/usuarios.json' 
 
 app = Flask(__name__)
-# 🚩 CONFIGURACIÓN CORS (CORREGIDA): supports_credentials fuera del diccionario resources
-# app_backend.py (Línea 17)
 
-# Código CORREGIDO:
+# 🚩 CONFIGURACIÓN CORS (CORRECCIÓN FINAL):
+# 1. supports_credentials=True está fuera del diccionario resources. (CORREGIDO el TypeError 502)
+# 2. origins usa el dominio EXACTO (para solucionar el error de conexión de API con cookies).
 CORS(app, 
      resources={r"/*": {"origins": "https://nombre-unico-de-tu-api-flask.fly.dev", 
                        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
      supports_credentials=True)
+
 # Variables globales para los datos
 CULTIVOS = [] 
 USUARIOS = [] 
@@ -180,13 +181,13 @@ def login():
         # 2. Verificar la contraseña hasheada
         if check_password_hash(user['contraseña_hash'], contraseña):
             
-            # --- CAMBIOS CLAVE: CONFIGURACIÓN DE LA COOKIE ---
+            # --- CONFIGURACIÓN DE LA COOKIE ---
             token_valor = user['id'] 
             
             # 3. Creamos la respuesta con el mensaje de éxito
             response = make_response(jsonify({"mensaje": "Inicio de sesión exitoso", "usuario": usuario}), 200)
 
-            # 4. Configuramos la Cookie Segura
+            # 4. Configuramos la Cookie Segura (espacios limpiados para evitar SyntaxError U+00A0)
             response.set_cookie(
                 'session_token',              # Nombre de la cookie
                 token_valor,                  # Valor (el ID de usuario)
@@ -285,12 +286,11 @@ def serve_index():
 @app.route('/<path:filename>')
 def serve_static(filename):
     # Asume que los archivos estáticos están en el directorio raíz del proyecto
-    # (index.html, styles.css, scripts.js)
     if os.path.exists(os.path.join('.', filename)):
         return send_from_directory('.', filename)
     else:
-        # Si el archivo no se encuentra, devuelve un 404 específico para estáticos
-        return jsonify({"error": "Archivo estático no encontrado"}), 404
+        # Devuelve el 404 si el archivo estático no se encuentra
+        return jsonify({"error": f"Archivo estático {filename} no encontrado"}), 404
 
 # ----------------------------------
 # --- INICIALIZACIÓN ---

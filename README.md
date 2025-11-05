@@ -81,6 +81,24 @@ Una vez que la máquina esté en estado started, tu aplicación completa estará
 
 Este es el proceso completo para encender tu Backend y reactivar la aplicación.
 
+aplicación Full Stack de gestión de cultivos, incluyendo
+Frontend (Vercel): CRUD y Lógica de Autenticación.
+
+Backend (Fly.io): API RESTful, Persistencia de Datos y Seguridad (Hashing de Contraseñas).
+
+Tu proyecto ya está terminado y funcionando en la nube.
+
+📝 Resumen de Comandos Clave
+Para cerrar el proyecto, aquí tienes un pequeño resumen de los comandos más importantes que usaste, por si los necesitas para futuros proyectos:
+
+Tarea,                                 Comando Backend (Fly.io),           Comando Frontend (Git)
+Desplegar / Actualizar la API,         flyctl deploy,                      N/A
+Verificar Estado de la API,            flyctl machine list -a [app-name],  N/A
+Diagnosticar Errores de API,           flyctl logs -a [app-name],          N/A
+Integrar Cambios Remotos,              N/A,                                git pull origin main
+Guardar y Sincronizar,                 N/A,                                git add . seguido de git commit y git push
+
+
 
 
 

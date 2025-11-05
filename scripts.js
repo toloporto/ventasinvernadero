@@ -2,7 +2,10 @@
 
 // --- CONFIGURACIÓN DE ENDPOINTS ---
 // RECUERDA: Reemplaza "nombre-unico-de-tu-api-flask" con tu nombre real de la aplicación Fly.io
-const BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev'; // <-- URL BASE ÚNICA
+//const BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev'; // <-- URL BASE ÚNICA
+
+// scripts.js
+const BASE_URL = 'https://web-production-8930b.up.railway.app'; // <--- ¡Nueva URL de Railway!
 
 // Endpoints (usados internamente por llamarApi)
 const API_CULTIVOS_ENDPOINT = '/api/v1/cultivos';

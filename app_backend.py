@@ -18,8 +18,19 @@ app = Flask(__name__)
 # 🚩 CONFIGURACIÓN CORS (CORRECCIÓN FINAL):
 # 1. supports_credentials=True está fuera del diccionario resources. (CORREGIDO el TypeError 502)
 # 2. origins usa el dominio EXACTO (para solucionar el error de conexión de API con cookies).
+# CORS(app, 
+     #resources={r"/*": {"origins": "https://nombre-unico-de-tu-api-flask.fly.dev", 
+                       #"methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
+     #supports_credentials=True)
+# CÁMBIALO A ESTO TEMPORALMENTE (PERMITE CUALQUIER ORIGEN)
+#CORS(app, 
+     #resources={r"/*": {"origins": "*", 
+                       #"methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
+     #supports_credentials=True)
+
+     # app_backend.py (Línea de CORS)
 CORS(app, 
-     resources={r"/*": {"origins": "https://nombre-unico-de-tu-api-flask.fly.dev", 
+     resources={r"/*": {"origins": "https://web-production-8930b.up.railway.app", # <-- ¡DOMINIO RAILWAY!
                        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
      supports_credentials=True)
 

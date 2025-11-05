@@ -1,0 +1,18 @@
+# fly.toml
+app = "antolin-invernadero-ventas" # <--- ¡VERIFICA QUE SEA ÚNICO!
+primary_region = "cdg" # O tu región elegida
+
+[build]
+# La ausencia de 'builder' fuerza el uso del Dockerfile
+
+[http_service]
+  internal_port = 8080 # El puerto interno usado por Gunicorn
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[mounts]
+source="data_ventas"
+destination="/vol/data"

@@ -1,0 +1,12 @@
+# .gitignore
+
+# Ejecutables y archivos de CLI (como el de Deta)
+space.exe
+
+# Archivos de caché
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Archivos de datos locales (aunque Fly.io los ignora, es buena práctica)
+*.json

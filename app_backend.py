@@ -5,32 +5,58 @@ from flask_cors import CORS
 from functools import wraps
 from datetime import datetime, timedelta
 import jwt
-
-# 🚨 NUEVA IMPORTACIÓN: Deta
-from deta import Deta 
+import os # Necesario para crear la carpeta si no existe
 
 app = Flask(__name__)
 
-# --- Configuración de Deta Base ---
-# Deta inyecta el proyecto key automáticamente.
-deta = Deta()
-db_cultivos = deta.Base("cultivos_db")
-db_usuarios = deta.Base("usuarios_db")
+# --- Rutas de Archivos (Persistencia para Fly.io) ---
+# 🚨 CRÍTICO: Usamos la ruta del VOLUMEN PERSISTENTE de Fly.io
+RUTA_PERSISTENCIA = '/vol/data'
+RUTA_DATOS_CULTIVOS = os.path.join(RUTA_PERSISTENCIA, 'cultivos.json')
+RUTA_DATOS_USUARIOS = os.path.join(RUTA_PERSISTENCIA, 'usuarios.json')
+
+# Aseguramos que la carpeta exista al iniciar
+os.makedirs(RUTA_PERSISTENCIA, exist_ok=True)
+
 
 # --- Configuración de Seguridad y CORS ---
-# Deta te dará un dominio público final (ej: https://[nombre-proyecto].deta.app)
-# Usaremos un placeholder seguro para CORS por ahora, lo ajustaremos en el frontend.
-DUMMY_DOMAIN = "https://tu-proyecto.deta.app" 
-SECRET_KEY = 'tu_clave_secreta_aqui' # Usa una clave segura y cámbiala
+# 🚨 CRÍTICO: Reemplaza con tu dominio real de Fly.io (ej: https://ventas-invernadero.fly.dev)
+FLYIO_DOMAIN = "https://[TU-APP-FLYIO].fly.dev" 
+SECRET_KEY = 'tu_clave_secreta_aqui' 
 app.config['SECRET_KEY'] = SECRET_KEY
 
 # Configuración de CORS
 CORS(app, 
-     resources={r"/*": {"origins": DUMMY_DOMAIN, 
+     resources={r"/*": {"origins": FLYIO_DOMAIN, 
                        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
      supports_credentials=True)
 
-# --- Funciones de Persistencia (Ahora usan Deta Base) ---
+# --- Funciones de Persistencia (Volvemos a JSON) ---
+
+def cargar_datos(ruta):
+    """Carga datos de un archivo JSON, o devuelve una lista vacía si no existe."""
+    try:
+        with open(ruta, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError:
+        # Esto puede ocurrir si el archivo está vacío.
+        return []
+
+def guardar_datos(datos, ruta):
+    """Guarda datos en un archivo JSON."""
+    with open(ruta, 'w') as f:
+        json.dump(datos, f, indent=4)
+
+def get_next_id(datos):
+    """Calcula el siguiente ID basado en la lista actual."""
+    if not datos:
+        return 1
+    # Asume que el ID es un entero
+    return max(item.get('id', 0) for item in datos) + 1
+
+# --- Token Required (Se mantiene igual) ---
 
 def token_required(f):
     @wraps(f)
@@ -38,40 +64,22 @@ def token_required(f):
         token = None
         if 'token' in request.cookies:
             token = request.cookies.get('token')
-
         if not token:
             return jsonify({'message': 'Token de autenticación faltante'}), 401
-
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
         except jwt.ExpiredSignatureError:
             return jsonify({'message': 'Token expirado'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'message': 'Token inválido'}), 401
-
         return f(*args, **kwargs)
     return decorated
 
-def cargar_cultivos():
-    """Carga todos los ítems de la base de datos de cultivos (incluye el 'key' como 'id')."""
-    # fetch devuelve los resultados como una lista de diccionarios
-    res = db_cultivos.fetch()
-    # Reemplazamos 'key' por 'id' para compatibilidad con el frontend
-    cultivos = [{'id': item['key'], **{k: v for k, v in item.items() if k != 'key'}} for item in res.items]
-    return cultivos
-
-def cargar_usuarios():
-    """Carga todos los ítems de la base de datos de usuarios."""
-    res = db_usuarios.fetch()
-    return res.items
-
 # --- Rutas del Frontend (Servir la Interfaz de Usuario) ---
-# Deta Space maneja el servir archivos estáticos con su "public folder", 
-# pero mantenemos estas rutas si el frontend está en la carpeta raíz.
 
 @app.route('/', methods=['GET'])
 def servir_index():
-    """Sirve la página principal (index.html) que contiene la aplicación."""
+    """Sirve la página principal (index.html)."""
     try:
         return send_file('index.html')
     except FileNotFoundError:
@@ -86,17 +94,19 @@ def servir_recursos(path):
         return "Recurso no encontrado.", 404
 
 # --- Rutas de Autenticación ---
+
 @app.route('/auth/register', methods=['POST'])
 def register():
     """Endpoint para registrar un nuevo usuario."""
     data = request.json
-    usuarios = cargar_usuarios()
+    usuarios = cargar_datos(RUTA_DATOS_USUARIOS)
     
     if any(u['username'] == data['username'] for u in usuarios):
         return jsonify({'message': 'El usuario ya existe'}), 400
     
-    # Guardar en Deta Base (Deta asigna el ID)
-    db_usuarios.put(data)
+    # Nota: No necesitamos ID para el usuario.
+    usuarios.append(data)
+    guardar_datos(usuarios, RUTA_DATOS_USUARIOS)
     
     return jsonify({'message': 'Registro exitoso'}), 201
 
@@ -107,7 +117,7 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
-    usuarios = cargar_usuarios()
+    usuarios = cargar_datos(RUTA_DATOS_USUARIOS)
     user = next((u for u in usuarios if u['username'] == username and u['password'] == password), None)
     
     if user:
@@ -118,13 +128,12 @@ def login():
         token = jwt.encode(token_payload, app.config['SECRET_KEY'], algorithm="HS256")
         
         response = make_response(jsonify({'message': 'Inicio de sesión exitoso'}))
-        # samesite='None' es CRÍTICO para CORS
         response.set_cookie(
             'token', 
             token, 
             httponly=True, 
             secure=True, 
-            samesite='None', 
+            samesite='None', # CRÍTICO para CORS
             expires=datetime.now() + timedelta(hours=24)
         )
         return response, 200
@@ -151,43 +160,46 @@ def logout():
 @token_required
 def obtener_cultivos():
     """Obtiene la lista completa de cultivos."""
-    cultivos = cargar_cultivos()
+    cultivos = cargar_datos(RUTA_DATOS_CULTIVOS)
     return jsonify(cultivos)
 
 @app.route('/api/v1/cultivos', methods=['POST'])
 @token_required
 def crear_cultivo():
-    """Crea un nuevo cultivo y lo guarda en Deta Base."""
+    """Crea un nuevo cultivo y lo guarda en el volumen persistente."""
     data = request.json
+    cultivos = cargar_datos(RUTA_DATOS_CULTIVOS)
     
-    # Deta Base genera el ID (key)
-    item = db_cultivos.put(data)
+    data['id'] = get_next_id(cultivos)
+    cultivos.append(data)
+    guardar_datos(cultivos, RUTA_DATOS_CULTIVOS)
     
-    # Devolvemos el ítem creado con el ID
-    response_item = {'id': item['key'], **{k: v for k, v in item.items() if k != 'key'}}
-    return jsonify(response_item), 201
+    return jsonify(data), 201
 
-@app.route('/api/v1/cultivos/<cultivo_id>', methods=['PUT'])
+@app.route('/api/v1/cultivos/<int:cultivo_id>', methods=['PUT'])
 @token_required
 def actualizar_cultivo(cultivo_id):
-    """Actualiza un cultivo existente usando su ID (key)."""
+    """Actualiza un cultivo existente."""
     updates = request.json
+    cultivos = cargar_datos(RUTA_DATOS_CULTIVOS)
     
-    # No se puede actualizar el 'id', solo los campos
-    updates.pop('id', None) 
+    for i, cultivo in enumerate(cultivos):
+        if cultivo.get('id') == cultivo_id:
+            # Mantener el ID original, actualizar el resto
+            updates.pop('id', None) 
+            cultivos[i].update(updates)
+            guardar_datos(cultivos, RUTA_DATOS_CULTIVOS)
+            return jsonify({'message': f'Cultivo {cultivo_id} actualizado', 'cultivo': cultivos[i]}), 200
     
-    # Actualiza el ítem en Deta Base usando el ID como key
-    db_cultivos.update(updates, key=cultivo_id)
-    
-    return jsonify({'message': f'Cultivo {cultivo_id} actualizado'}), 200
+    return jsonify({'message': 'Cultivo no encontrado'}), 404
 
-@app.route('/api/v1/cultivos/<cultivo_id>', methods=['DELETE'])
+@app.route('/api/v1/cultivos/<int:cultivo_id>', methods=['DELETE'])
 @token_required
 def eliminar_cultivo(cultivo_id):
-    """Elimina un cultivo usando su ID (key)."""
-    
-    # Borra el ítem de Deta Base usando el ID como key
-    db_cultivos.delete(cultivo_id)
+    """Elimina un cultivo."""
+    cultivos = cargar_datos(RUTA_DATOS_CULTIVOS)
+    cultivos = [c for c in cultivos if c.get('id') != cultivo_id]
+    guardar_datos(cultivos, RUTA_DATOS_CULTIVOS)
     
     return jsonify({'message': f'Cultivo {cultivo_id} eliminado'}), 200
 

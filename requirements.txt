@@ -2,4 +2,4 @@ Flask==3.0.3
 flask-cors==4.0.1
 gunicorn==22.0.0
 PyJWT==2.8.0
-deta==1.1.0  # <--- NUEVA DEPENDENCIA
+# ¡Eliminada la dependencia de 'deta' ya que volvemos a Fly.io!

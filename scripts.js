@@ -1,8 +1,8 @@
 // scripts.js
 
-// 🚨 CRÍTICO: Reemplaza con la URL de tu servicio Deta.
-// Ejemplo: https://ventas-invernadero-antolin.deta.app
-const BASE_URL = 'https://ventas-invernadero-antolin.deta.app'; 
+// 🚨 CRÍTICO: Reemplaza con la URL de tu dominio de Fly.io.
+// Ejemplo: https://ventas-invernadero-antolin.fly.dev
+const BASE_URL = 'https://[TU-APP-FLYIO].fly.dev'; 
 
 // --- Estado de la Aplicación ---
 let cultivosData = []; // Almacenará los datos de cultivos
@@ -141,6 +141,7 @@ function renderCultivosTable(data) {
 
     data.forEach(cultivo => {
         const row = tableBody.insertRow();
+        // NOTA: El ID es un número entero en el backend de Fly.io, no un string de Deta.
         row.innerHTML = `
             <td>${cultivo.id}</td>
             <td>${cultivo.nombre}</td>
@@ -148,8 +149,8 @@ function renderCultivosTable(data) {
             <td>${cultivo.cantidad_sembrada}</td>
             <td>${cultivo.fecha_siembra}</td>
             <td>
-                <button class="btn btn-sm btn-info" onclick="editCultivo('${cultivo.id}')">Editar</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteCultivo('${cultivo.id}')">Eliminar</button>
+                <button class="btn btn-sm btn-info" onclick="editCultivo(${cultivo.id})">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteCultivo(${cultivo.id})">Eliminar</button>
             </td>
         `;
     });
@@ -158,9 +159,10 @@ function renderCultivosTable(data) {
 async function saveCultivo(event) {
     event.preventDefault();
     const form = event.target;
-    const isEdit = form.dataset.editId;
+    // CRÍTICO: El ID de Fly.io es numérico, no string como en Deta.
+    const isEdit = form.dataset.editId ? parseInt(form.dataset.editId) : null;
     
-    // Crear el objeto cultivo sin el ID
+    // Crear el objeto cultivo sin el ID (lo asigna el servidor)
     const cultivo = {
         nombre: form.nombre.value,
         estado: form.estado.value,
@@ -170,13 +172,13 @@ async function saveCultivo(event) {
 
     let result;
     if (isEdit) {
-        // En edición, enviamos los datos y el ID va en la URL
+        // En edición, enviamos los datos y el ID va en la URL (como número)
         result = await apiFetch(`/api/v1/cultivos/${isEdit}`, {
             method: 'PUT',
             body: cultivo
         });
     } else {
-        // Al crear, la API de Deta le asignará un ID (key)
+        // Al crear, el servidor asigna el ID.
         result = await apiFetch('/api/v1/cultivos', {
             method: 'POST',
             body: cultivo
@@ -195,7 +197,7 @@ async function saveCultivo(event) {
 }
 
 function editCultivo(id) {
-    // Buscar el cultivo usando el ID de Deta (que es un string)
+    // Buscar el cultivo usando el ID (que es un número)
     const cultivo = cultivosData.find(c => c.id === id);
     if (!cultivo) return;
 
@@ -218,6 +220,7 @@ async function deleteCultivo(id) {
         return;
     }
     
+    // El ID se envía como número en la URL
     const result = await apiFetch(`/api/v1/cultivos/${id}`, { method: 'DELETE' });
 
     if (result.success) {
@@ -229,6 +232,7 @@ async function deleteCultivo(id) {
 }
 
 // --- Lógica de Gráficos ---
+// (Esta sección no requiere cambios y funciona igual que antes)
 
 let chartInstance = null; // Para almacenar la instancia del gráfico
 
@@ -286,6 +290,7 @@ function renderCharts(data) {
 }
 
 // --- Inicialización y Event Listeners ---
+// (Se mantiene igual)
 
 document.addEventListener('DOMContentLoaded', () => {
     

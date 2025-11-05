@@ -2,23 +2,24 @@ import os
 import json
 import uuid
 import datetime
+from functools import wraps # <-- AÑADIDO: Para crear el decorador de autenticación
 # NUEVAS IMPORTACIONES CLAVE para Autenticación
 from werkzeug.security import generate_password_hash, check_password_hash 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response # <-- MODIFICADO: Añadido make_response
 from flask_cors import CORS
 
 # --- CONFIGURACIÓN DE PERSISTENCIA ---
 RUTA_DATOS_CULTIVOS = '/vol/data/cultivos.json' 
-# ¡Nueva ruta para los usuarios!
 RUTA_DATOS_USUARIOS = '/vol/data/usuarios.json' 
 
 app = Flask(__name__)
-# 🚩 CORRECCIÓN CORS: Configuración explícita y permisiva para asegurar que POST y OPTIONS funcionen en todos los endpoints
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
+# 🚩 CORRECCIÓN CORS: Configuración para permitir el envío de credenciales/cookies
+# El parámetro supports_credentials=True es necesario para que el Frontend pueda enviar y recibir cookies.
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}, "supports_credentials": True}) # <-- MODIFICADO
 
 # Variables globales para los datos
 CULTIVOS = [] 
-USUARIOS = [] # Nueva variable global para usuarios
+USUARIOS = [] 
 
 # -------------------------------------
 # --- FUNCIONES DE MANEJO DE DATOS ---
@@ -57,7 +58,7 @@ def guardar_cultivos():
         print(f"Error al guardar cultivos: {e}")
         return False
 
-# --- MANEJO DE USUARIOS (NUEVO) ---
+# --- MANEJO DE USUARIOS (EXISTENTE) ---
 
 def cargar_usuarios():
     """Carga los datos de usuarios del archivo JSON. Crea el archivo si no existe."""
@@ -90,8 +91,42 @@ def guardar_usuarios():
         print(f"Error al guardar usuarios: {e}")
         return False
 
+# -------------------------------------
+# --- MIDDLEWARE DE AUTENTICACIÓN CON COOKIE ---
+# -------------------------------------
+
+def token_requerido(f):
+    """
+    Decorador que verifica la existencia y validez de la 'session_token' 
+    en las cookies de la petición.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # 1. Intentar obtener el token de la cookie
+        token_usuario_id = request.cookies.get('session_token') # <-- Buscamos el token en la cookie
+        
+        if not token_usuario_id:
+            # No hay token en la cookie: No autenticado
+            return jsonify({'error': 'No autenticado. Inicie sesión.'}), 401
+        
+        # 2. Verificar que el token (que es el ID de usuario) sea válido
+        usuario_actual = next((u for u in USUARIOS if u['id'] == token_usuario_id), None)
+        
+        if not usuario_actual:
+            # Token inválido o ID de usuario no existe
+            return jsonify({'error': 'Token inválido o sesión expirada'}), 401
+        
+        # Guardamos el usuario para usarlo si es necesario (ej: si se necesita el ID de usuario)
+        request.current_user = usuario_actual 
+        
+        # Continuar con la función de la ruta original
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 # ----------------------------------
-# --- RUTAS DE AUTENTICACIÓN (NUEVAS) ---
+# --- RUTAS DE AUTENTICACIÓN ---
 # ----------------------------------
 
 @app.route('/auth/registro', methods=['POST'])
@@ -115,7 +150,7 @@ def registro():
     nuevo_usuario = {
         'id': str(uuid.uuid4()),
         'usuario': usuario,
-        'contraseña_hash': hashed_password # Guardar el hash, no la contraseña original
+        'contraseña_hash': hashed_password 
     }
     
     USUARIOS.append(nuevo_usuario)
@@ -125,7 +160,7 @@ def registro():
 
 @app.route('/auth/login', methods=['POST'])
 def login():
-    """Ruta para iniciar sesión."""
+    """Ruta para iniciar sesión. Devuelve una cookie HttpOnly con el ID de usuario."""
     data = request.get_json()
     usuario = data.get('usuario')
     contraseña = data.get('contraseña')
@@ -139,22 +174,44 @@ def login():
     if user:
         # 2. Verificar la contraseña hasheada
         if check_password_hash(user['contraseña_hash'], contraseña):
-            return jsonify({"mensaje": "Inicio de sesión exitoso", "usuario": usuario}), 200
+            
+            # --- CAMBIOS CLAVE: CONFIGURACIÓN DE LA COOKIE ---
+            token_valor = user['id'] 
+            
+            # 3. Creamos la respuesta con el mensaje de éxito
+            response = make_response(jsonify({"mensaje": "Inicio de sesión exitoso", "usuario": usuario}), 200)
+
+            # 4. Configuramos la Cookie Segura
+            response.set_cookie(
+                'session_token',              # Nombre de la cookie
+                token_valor,                  # Valor (el ID de usuario)
+                httponly=True,                # Impide acceso desde JS
+                secure=True,                  # Solo se envía a través de HTTPS (necesario en Fly.io)
+                samesite='Lax',               # Funciona bien en peticiones CORS
+                max_age=3600 * 24 * 7         # Caducidad: 7 días
+            )
+            
+            return response # Devolvemos la respuesta con la cookie configurada
+            # ------------------------------------------------
+            
         else:
-            return jsonify({"error": "Contraseña incorrecta"}), 401 # 401 Unauthorized
+            return jsonify({"error": "Contraseña incorrecta"}), 401 
     else:
-        return jsonify({"error": "Usuario no encontrado"}), 404 # 404 Not Found
+        return jsonify({"error": "Usuario no encontrado"}), 404 
 
 # ----------------------------------
-# --- RUTAS DE CULTIVOS (EXISTENTES) ---
+# --- RUTAS DE CULTIVOS (PROTEGIDAS) ---
 # ----------------------------------
 
 @app.route('/api/v1/cultivos', methods=['GET'])
+@token_requerido # <-- PROTEGIDA
 def listar_cultivos():
     """GET: Lista todos los cultivos."""
+    # Opcional: Si los cultivos fueran por usuario, usaríamos request.current_user['id']
     return jsonify(CULTIVOS)
 
 @app.route('/api/v1/cultivos', methods=['POST'])
+@token_requerido # <-- PROTEGIDA
 def agregar_cultivo():
     """POST: Agrega un nuevo cultivo."""
     try:
@@ -176,7 +233,27 @@ def agregar_cultivo():
     except Exception as e:
         return jsonify({"error": f"Error interno al agregar: {str(e)}"}), 500
 
+@app.route('/api/v1/cultivos/<id_cultivo>', methods=['PUT']) # <-- Ruta PUT añadida/confirmada
+@token_requerido # <-- PROTEGIDA
+def actualizar_cultivo(id_cultivo):
+    """PUT: Actualiza un cultivo existente."""
+    global CULTIVOS
+    data = request.get_json()
+    cultivo_encontrado = next((c for c in CULTIVOS if c.get('id') == id_cultivo), None)
+
+    if not cultivo_encontrado:
+        return jsonify({"error": "Cultivo no encontrado"}), 404
+
+    # Actualizar solo los campos proporcionados
+    for key, value in data.items():
+        if key != 'id':
+            cultivo_encontrado[key] = value
+
+    guardar_cultivos()
+    return jsonify({"mensaje": "Cultivo actualizado con éxito"}, cultivo_encontrado), 200
+
 @app.route('/api/v1/cultivos/<id_cultivo>', methods=['DELETE'])
+@token_requerido # <-- PROTEGIDA
 def eliminar_cultivo(id_cultivo):
     """DELETE: Elimina un cultivo por ID."""
     global CULTIVOS
@@ -196,7 +273,7 @@ def eliminar_cultivo(id_cultivo):
 
 # Cargar los datos al iniciar la aplicación (se ejecutan al inicio de Gunicorn)
 cargar_cultivos()
-cargar_usuarios() # ¡NUEVO: Cargar los usuarios para la persistencia!
+cargar_usuarios() 
 
 if __name__ == '__main__':
     # Esto es solo para ejecución local

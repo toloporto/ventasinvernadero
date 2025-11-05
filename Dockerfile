@@ -18,4 +18,5 @@ COPY cultivos.json .
 # El comando para iniciar el servidor (usa Gunicorn)
 # CMD gunicorn app_backend:app --bind 0.0.0.0:8080
 # Cámbiala a:
-CMD gunicorn app_backend:app --bind 0.0.0.0:$PORT
+# CMD gunicorn app_backend:app --bind 0.0.0.0:$PORT
+CMD ["gunicorn", "app_backend:app", "--bind", "0.0.0.0:$PORT"]

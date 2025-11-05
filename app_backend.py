@@ -2,10 +2,11 @@ import os
 import json
 import uuid
 import datetime
-from functools import wraps # <-- AÑADIDO: Para crear el decorador de autenticación
-# NUEVAS IMPORTACIONES CLAVE para Autenticación
+from functools import wraps 
+# Importaciones clave
 from werkzeug.security import generate_password_hash, check_password_hash 
-from flask import Flask, request, jsonify, make_response # <-- MODIFICADO: Añadido make_response
+# Se añade send_from_directory para servir el frontend
+from flask import Flask, request, jsonify, make_response, send_from_directory 
 from flask_cors import CORS
 
 # --- CONFIGURACIÓN DE PERSISTENCIA ---
@@ -13,8 +14,7 @@ RUTA_DATOS_CULTIVOS = '/vol/data/cultivos.json'
 RUTA_DATOS_USUARIOS = '/vol/data/usuarios.json' 
 
 app = Flask(__name__)
-# 🚩 CONFIGURACIÓN CORS: IMPRESCINDIBLE para enviar/recibir cookies entre Frontend y Backend.
-# app_backend.py
+# 🚩 CONFIGURACIÓN CORS (CORREGIDA): supports_credentials fuera del diccionario resources
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, supports_credentials=True)
 # Variables globales para los datos
 CULTIVOS = [] 
@@ -182,12 +182,12 @@ def login():
 
             # 4. Configuramos la Cookie Segura
             response.set_cookie(
-                'session_token',              # Nombre de la cookie
-                token_valor,                  # Valor (el ID de usuario)
-                httponly=True,                # Impide acceso desde JS (SEGURIDAD)
-                secure=True,                  # Solo se envía a través de HTTPS (SEGURIDAD)
-                samesite='Lax',               # Funciona bien en peticiones CORS
-                max_age=3600 * 24 * 7         # Caducidad: 7 días
+                'session_token',              # Nombre de la cookie
+                token_valor,                  # Valor (el ID de usuario)
+                httponly=True,                # Impide acceso desde JS (SEGURIDAD)
+                secure=True,                  # Solo se envía a través de HTTPS (SEGURIDAD)
+                samesite='Lax',               # Funciona bien en peticiones CORS
+                max_age=3600 * 24 * 7         # Caducidad: 7 días
             )
             
             return response # Devolvemos la respuesta con la cookie configurada
@@ -265,6 +265,27 @@ def eliminar_cultivo(id_cultivo):
     else:
         return jsonify({"error": "Cultivo no encontrado"}), 404
         
+# ----------------------------------------------------
+# --- RUTAS PARA SERVIR EL FRONTEND (CORRECCIÓN 404) ---
+# ----------------------------------------------------
+
+# 1. Ruta principal para servir el index.html al acceder a la URL base
+@app.route('/')
+def serve_index():
+    # Asume que index.html está en el directorio raíz del proyecto
+    return send_from_directory('.', 'index.html')
+
+# 2. Ruta genérica para servir archivos estáticos (js, css, etc.)
+@app.route('/<path:filename>')
+def serve_static(filename):
+    # Asume que los archivos estáticos están en el directorio raíz del proyecto
+    # (index.html, styles.css, scripts.js)
+    if os.path.exists(os.path.join('.', filename)):
+        return send_from_directory('.', filename)
+    else:
+        # Si el archivo no se encuentra, devuelve un 404 específico para estáticos
+        return jsonify({"error": "Archivo estático no encontrado"}), 404
+
 # ----------------------------------
 # --- INICIALIZACIÓN ---
 # ----------------------------------

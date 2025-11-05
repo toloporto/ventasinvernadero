@@ -2,7 +2,7 @@
 
 // --- CONFIGURACIÓN DE ENDPOINTS ---
 // RECUERDA: Reemplaza "nombre-unico-de-tu-api-flask" con tu nombre real de la aplicación Fly.io
-const BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev'; // <-- NUEVA URL BASE ÚNICA
+const BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev'; // <-- URL BASE ÚNICA
 
 // Endpoints (usados internamente por llamarApi)
 const API_CULTIVOS_ENDPOINT = '/api/v1/cultivos';
@@ -69,7 +69,10 @@ async function llamarApi(endpoint, method = 'GET', data = null) {
         return response;
     } catch (error) {
         console.error("❌ Error de conexión con la API:", error);
-        alert(`Error de conexión con la API (${method} ${endpoint}). Asegúrese de que el Backend está activo en: ${BASE_URL}`);
+        // Sugerencia: Alerta solo si no es la carga inicial de login para evitar spam
+        if (endpoint !== API_LOGIN_ENDPOINT || IS_AUTHENTICATED) { 
+            alert(`Error de conexión con la API (${method} ${endpoint}). Asegúrese de que el Backend está activo en: ${BASE_URL}`);
+        }
         throw error;
     }
 }

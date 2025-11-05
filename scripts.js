@@ -1,8 +1,8 @@
 // scripts.js
 
-// 🚨 CRÍTICO: Reemplaza con la URL de tu servicio en Render.
-// Ejemplo: https://ventas-invernadero-antolin.onrender.com
-const BASE_URL = 'https://ventas-invernadero-antolin.onrender.com';
+// 🚨 CRÍTICO: Reemplaza con la URL de tu servicio Deta.
+// Ejemplo: https://ventas-invernadero-antolin.deta.app
+const BASE_URL = 'https://ventas-invernadero-antolin.deta.app'; 
 
 // --- Estado de la Aplicación ---
 let cultivosData = []; // Almacenará los datos de cultivos
@@ -148,8 +148,8 @@ function renderCultivosTable(data) {
             <td>${cultivo.cantidad_sembrada}</td>
             <td>${cultivo.fecha_siembra}</td>
             <td>
-                <button class="btn btn-sm btn-info" onclick="editCultivo(${cultivo.id})">Editar</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteCultivo(${cultivo.id})">Eliminar</button>
+                <button class="btn btn-sm btn-info" onclick="editCultivo('${cultivo.id}')">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteCultivo('${cultivo.id}')">Eliminar</button>
             </td>
         `;
     });
@@ -160,6 +160,7 @@ async function saveCultivo(event) {
     const form = event.target;
     const isEdit = form.dataset.editId;
     
+    // Crear el objeto cultivo sin el ID
     const cultivo = {
         nombre: form.nombre.value,
         estado: form.estado.value,
@@ -169,12 +170,13 @@ async function saveCultivo(event) {
 
     let result;
     if (isEdit) {
-        cultivo.id = parseInt(isEdit);
+        // En edición, enviamos los datos y el ID va en la URL
         result = await apiFetch(`/api/v1/cultivos/${isEdit}`, {
             method: 'PUT',
             body: cultivo
         });
     } else {
+        // Al crear, la API de Deta le asignará un ID (key)
         result = await apiFetch('/api/v1/cultivos', {
             method: 'POST',
             body: cultivo
@@ -193,6 +195,7 @@ async function saveCultivo(event) {
 }
 
 function editCultivo(id) {
+    // Buscar el cultivo usando el ID de Deta (que es un string)
     const cultivo = cultivosData.find(c => c.id === id);
     if (!cultivo) return;
 

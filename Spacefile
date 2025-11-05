@@ -1,0 +1,13 @@
+# Spacefile
+v: 1
+
+micros:
+  - name: ventas-api
+    src: .
+    engine: python3.9 # O python3.11/python3.12 si Deta lo soporta, 3.9 es el más seguro
+    # El comando para iniciar la aplicación Gunicorn
+    run: gunicorn app_backend:app
+    
+    # Deta sirve los archivos estáticos automáticamente si están en una carpeta 'public'
+    # Pero también funciona con las rutas de Flask que creamos si todo está en la raíz:
+    public: true

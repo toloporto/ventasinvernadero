@@ -169,6 +169,13 @@ async function cargarCultivos() {
         loadingMessage.textContent = `❌ ERROR DE CONEXIÓN: ${error.message}. Verifica que la URL de Fly.io sea correcta.`;
         loadingMessage.style.color = 'var(--color-danger)';
     }
+    // Dentro de la función principal de carga/actualización:
+    function actualizarDashboard(cultivos) {
+    // ... [Tu código existente para actualizar la tabla y los KPIs]
+
+    // ¡NUEVA LLAMADA!
+    dibujarGraficoGanancias(); // <-- Asegúrate de que esta línea esté aquí
+    }
 }
 
 /**
@@ -426,6 +433,95 @@ function resetFormulario() {
     document.getElementById('precio_compra').value = '0.00';
     document.getElementById('precio_venta').value = '0.00';
     document.getElementById('dias_alerta').value = '7';
+}
+
+/**
+ * Dibuja un gráfico de barras con los 5 cultivos con mayor ganancia potencial.
+ */
+function dibujarGraficoGanancias() {
+    // 1. Obtener y preparar datos (usamos la variable CULTIVOS_CACHE global)
+    const datosGanancia = CULTIVOS_CACHE.map(cultivo => {
+        // La ganancia potencial es (Precio Venta - Precio Compra)
+        const ganancia = (parseFloat(cultivo.precio_venta) - parseFloat(cultivo.precio_compra));
+        return {
+            nombre: cultivo.nombre,
+            ganancia: ganancia
+        };
+    }).filter(c => c.ganancia > 0) // Solo cultivos con ganancia
+      .sort((a, b) => b.ganancia - a.ganancia) // Ordenar de mayor a menor
+      .slice(0, 5); // Tomar solo los 5 principales
+
+    // Si no hay datos, limpiamos el canvas
+    if (datosGanancia.length === 0) {
+        const ctx = document.getElementById('gananciaChart').getContext('2d');
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        return; 
+    }
+
+    // 2. Extraer etiquetas y valores para Chart.js
+    const etiquetas = datosGanancia.map(d => d.nombre);
+    const valores = datosGanancia.map(d => d.ganancia.toFixed(2));
+
+    // 3. Destruir gráfico anterior si existe (para evitar duplicados al recargar)
+    const canvasElement = document.getElementById('gananciaChart');
+    if (window.gananciaChartInstance) {
+        window.gananciaChartInstance.destroy();
+    }
+
+    // 4. Configuración y Creación del Gráfico
+    const ctx = canvasElement.getContext('2d');
+    
+    window.gananciaChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: etiquetas,
+            datasets: [{
+                label: 'Ganancia Potencial (€)',
+                data: valores,
+                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Ganancia (€)'
+                    },
+                    ticks: {
+                        color: '#ddd' // Color de texto para tema oscuro
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)' // Líneas de cuadrícula
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#ddd' // Color de texto para tema oscuro
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.1)' // Líneas de cuadrícula
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ddd' // Color de la leyenda
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Proyección Top 5 (Venta - Compra)',
+                    color: '#fff' // Color del título
+                }
+            }
+        }
+    });
 }
 
 

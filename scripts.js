@@ -2,24 +2,21 @@
 
 // --- CONFIGURACIÓN DE ENDPOINTS ---
 // RECUERDA: Reemplaza "nombre-unico-de-tu-api-flask" con tu nombre real de la aplicación Fly.io
-const API_BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/api/v1/cultivos';
+const BASE_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev'; // <-- NUEVA URL BASE ÚNICA
 
-// ¡NUEVOS ENDPOINTS DE AUTENTICACIÓN!
-const API_REGISTRO_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/auth/registro';
-const API_LOGIN_URL = 'https://nombre-unico-de-tu-api-flask.fly.dev/auth/login';
+// Endpoints (usados internamente por llamarApi)
+const API_CULTIVOS_ENDPOINT = '/api/v1/cultivos';
+const API_REGISTRO_ENDPOINT = '/auth/registro';
+const API_LOGIN_ENDPOINT = '/auth/login';
 
 
 // --- VARIABLES GLOBALES DEL DOM ---
-
-// Elementos del Dashboard (Existentes)
 const tableBody = document.getElementById('cultivoList');
 const form = document.getElementById('cultivoForm');
 const submitButton = document.getElementById('submitButton');
 const originalNameInput = document.getElementById('cultivoNombreOriginal'); 
 const loadingMessage = document.getElementById('loading-message');
 const searchInput = document.getElementById('cultivoSearch'); 
-
-// Elementos de Autenticación (Nuevos, del index.html modificado)
 const authContainer = document.getElementById('auth-container');
 const dashboardContainer = document.getElementById('dashboard-container');
 const loginForm = document.getElementById('login-form');
@@ -27,13 +24,58 @@ const registroForm = document.getElementById('registro-form');
 const logoutButton = document.getElementById('logout-button');
 const authMessage = document.getElementById('auth-message');
 
-
 let modoEdicion = false; 
-let cultivosData = []; // <-- Variable que almacena todos los datos
-let IS_AUTHENTICATED = false; // ¡Estado de la sesión!
+let cultivosData = []; 
+let IS_AUTHENTICATED = false; 
 
 
-// --- 1. FUNCIONES DE AUTENTICACIÓN (NUEVAS) ---
+// -----------------------------------------------------
+// --- NUEVA FUNCIÓN DE UTILIDAD: LLAMAR A LA API ---
+// -----------------------------------------------------
+
+/**
+ * Función centralizada para realizar peticiones a la API.
+ * CRUCIAL: Añade `credentials: 'include'` para enviar la cookie de sesión.
+ */
+async function llamarApi(endpoint, method = 'GET', data = null) {
+    
+    const options = {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            // ¡Ya NO necesitamos el Authorization Header/Token aquí!
+        },
+        // 🚨 CAMBIO CLAVE: Permite que el navegador envíe la cookie HttpOnly al Backend.
+        credentials: 'include' 
+    };
+
+    if (data && method !== 'GET') {
+        options.body = JSON.stringify(data);
+    }
+
+    try {
+        const response = await fetch(BASE_URL + endpoint, options);
+        
+        // Manejo de error de autenticación (401)
+        if (response.status === 401 && endpoint !== API_LOGIN_ENDPOINT) {
+            console.error("Sesión expirada o no autorizado.");
+            // Si el error 401 no viene del login (es una ruta CRUD), forzamos el cierre de sesión
+            if (IS_AUTHENTICATED) {
+                 // Si el usuario estaba logueado y recibe 401, forzamos la vuelta al login
+                 cerrarSesion(true); // Pasar 'true' para indicar sesión expirada
+            }
+        }
+        
+        return response;
+    } catch (error) {
+        console.error("❌ Error de conexión con la API:", error);
+        alert(`Error de conexión con la API (${method} ${endpoint}). Asegúrese de que el Backend está activo en: ${BASE_URL}`);
+        throw error;
+    }
+}
+
+
+// --- 1. FUNCIONES DE AUTENTICACIÓN ---
 
 /**
  * Muestra u oculta los contenedores de Auth y Dashboard.
@@ -42,12 +84,10 @@ function toggleInterface(isAuthenticated) {
     if (isAuthenticated) {
         authContainer.style.display = 'none';
         dashboardContainer.style.display = 'block';
-        // Una vez dentro, cargamos los datos
         cargarCultivos(); 
     } else {
         authContainer.style.display = 'block';
         dashboardContainer.style.display = 'none';
-        // Limpiar mensajes y formularios al cerrar sesión
         authMessage.textContent = '';
         loginForm.reset();
         registroForm.reset();
@@ -55,7 +95,26 @@ function toggleInterface(isAuthenticated) {
 }
 
 /**
+ * Cierra la sesión y vuelve a la pantalla de login.
+ * @param {boolean} [isExpired=false] - Indica si la sesión expiró por 401.
+ */
+function cerrarSesion(isExpired = false) {
+    IS_AUTHENTICATED = false;
+    toggleInterface(false);
+    tableBody.innerHTML = '';
+    cultivosData = [];
+    resetFormulario();
+    if (!isExpired) {
+        alert('Sesión cerrada.');
+    } else {
+        alert('🚨 Su sesión ha expirado (Error 401). Vuelva a iniciar sesión.');
+    }
+}
+
+
+/**
  * Intenta registrar un nuevo usuario.
+ * (Usa llamarApi pero sin control de 401, ya que no requiere autenticación)
  */
 async function manejarRegistro(event) {
     event.preventDefault();
@@ -66,11 +125,8 @@ async function manejarRegistro(event) {
     const contraseña = document.getElementById('registro-contraseña').value;
 
     try {
-        const response = await fetch(API_REGISTRO_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario, contraseña }),
-        });
+        // 🚩 CAMBIO: Usar llamarApi
+        const response = await llamarApi(API_REGISTRO_ENDPOINT, 'POST', { usuario, contraseña });
 
         const resultado = await response.json();
 
@@ -100,19 +156,19 @@ async function manejarLogin(event) {
     const contraseña = document.getElementById('login-contraseña').value;
 
     try {
-        const response = await fetch(API_LOGIN_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario, contraseña }),
-        });
+        // 🚩 CAMBIO: Usar llamarApi
+        const response = await llamarApi(API_LOGIN_ENDPOINT, 'POST', { usuario, contraseña });
 
         const resultado = await response.json();
 
         if (response.ok) {
-            // Éxito en el login
+            // 🚨 CAMBIO CLAVE: El navegador guarda la cookie HttpOnly automáticamente.
+            // ELIMINAMOS CUALQUIER CÓDIGO QUE GUARDE EL TOKEN MANUALMENTE (ej. localStorage)
+            
             IS_AUTHENTICATED = true;
             toggleInterface(true);
             authMessage.textContent = ''; // Limpiar mensaje de auth
+            console.log("Login Exitoso: Cookie de sesión recibida.");
         } else {
             authMessage.textContent = `❌ Error: ${resultado.error || 'Fallo en la autenticación'}`;
             authMessage.style.color = 'var(--color-danger)';
@@ -123,63 +179,39 @@ async function manejarLogin(event) {
     }
 }
 
-/**
- * Cierra la sesión y vuelve a la pantalla de login.
- */
-function cerrarSesion() {
-    IS_AUTHENTICATED = false;
-    toggleInterface(false);
-    // Limpiar el formulario de cultivos y datos de la tabla
-    tableBody.innerHTML = '';
-    cultivosData = [];
-    resetFormulario();
-    alert('Sesión cerrada.');
-}
 
-
-// --- 2. FUNCIONES DE MANEJO DE LA API (CRUD EXISTENTES, CON CHECK DE AUTH) ---
+// --- 2. FUNCIONES DE MANEJO DE LA API (CRUD REFRACTORIZADO) ---
 
 /**
  * 1. GET (Leer): Carga, procesa y renderiza todos los cultivos.
  */
 async function cargarCultivos() {
-    // ⚠️ REVISIÓN: Solo carga si está autenticado
     if (!IS_AUTHENTICATED) return; 
     
     loadingMessage.textContent = 'Cargando datos de la API...';
     try {
-        const response = await fetch(API_BASE_URL);
+        // 🚩 CAMBIO: Usar llamarApi (esto enviará la cookie automáticamente)
+        const response = await llamarApi(API_CULTIVOS_ENDPOINT, 'GET');
         
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Error de la API: ${response.status} - ${errorText}`);
+            // Si el error es 401, llamarApi ya lo manejará, pero si es otro error de API:
+             const errorText = await response.text();
+             throw new Error(`Error de la API: ${response.status} - ${errorText}`);
         }
         
         const cultivos = await response.json();
-        
-        cultivosData = cultivos; // <-- CAMBIO CLAVE N°1: La variable es 'cultivosData'
+        cultivosData = cultivos; 
         
         loadingMessage.style.display = 'none'; 
         renderizarTabla(cultivosData); 
-        
-        actualizarKpis(cultivosData); // Actualiza los KPIs después de la carga
-        dibujarGraficoGanancias(cultivosData); // <-- CAMBIO CLAVE N°2: Llamar aquí y pasar los datos
+        actualizarKpis(cultivosData); 
+        dibujarGraficoGanancias(cultivosData); 
 
     } catch (error) {
         console.error('Error al cargar cultivos:', error);
-        loadingMessage.textContent = `❌ ERROR DE CONEXIÓN: ${error.message}. Verifica que la URL de Fly.io sea correcta.`;
+        loadingMessage.textContent = `❌ ERROR DE CONEXIÓN o AUTENTICACIÓN: ${error.message}`;
         loadingMessage.style.color = 'var(--color-danger)';
     }
-    
-    // <-- CAMBIO CLAVE N°3: Eliminar esta sección duplicada y mal colocada
-    /* // Dentro de la función principal de carga/actualización:
-    function actualizarDashboard(cultivos) {
-    // ... [Tu código existente para actualizar la tabla y los KPIs]
-
-    // ¡NUEVA LLAMADA!
-    dibujarGraficoGanancias(); // <-- Asegúrate de que esta línea esté aquí
-    }
-    */
 }
 
 /**
@@ -187,55 +219,46 @@ async function cargarCultivos() {
  */
 async function manejarEnvioFormulario(event) {
     event.preventDefault(); 
-    // ⚠️ REVISIÓN: Bloquear si no está autenticado
     if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para realizar cambios.');
-
 
     const datosCultivo = obtenerDatosFormulario();
 
-    // 🚩 Validación de campos (conservado)
     if (!datosCultivo.nombre || !datosCultivo.fecha_siembra || !datosCultivo.fecha_cosecha) {
         alert('Por favor, rellena el nombre, la fecha de siembra y la fecha de cosecha.');
         return;
     }
     
-    // VALIDACIÓN DE FECHAS (conservado)
     if (!validarFechas(datosCultivo.fecha_siembra, datosCultivo.fecha_cosecha)) {
         alert('❌ Error: La fecha de cosecha no puede ser anterior a la fecha de siembra.');
         return; 
     }
 
     const idOriginal = originalNameInput.value; 
-    let url = API_BASE_URL;
+    let endpoint = API_CULTIVOS_ENDPOINT;
     let method = 'POST';
     
     if (modoEdicion) {
-        url = `${API_BASE_URL}/${idOriginal}`; 
+        endpoint = `${API_CULTIVOS_ENDPOINT}/${idOriginal}`; 
         method = 'PUT';
         datosCultivo.id = idOriginal; 
     }
 
     try {
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(datosCultivo),
-        });
+        // 🚩 CAMBIO: Usar llamarApi
+        const response = await llamarApi(endpoint, method, datosCultivo);
 
         const resultado = await response.json();
 
         if (response.ok) {
             alert(resultado.mensaje || (modoEdicion ? 'Cultivo actualizado.' : 'Cultivo añadido.'));
             resetFormulario();
-            cargarCultivos(); // <-- Recarga que llamará al gráfico
+            cargarCultivos(); 
         } else {
             alert(`Error ${response.status}: ${resultado.error || 'Algo salió mal en el servidor.'}`);
         }
     } catch (error) {
         console.error('Error al enviar el formulario:', error);
-        alert('Error de conexión con la API. Asegúrate de que Fly.io esté funcionando.');
+        // El error de conexión ya lo maneja llamarApi
     }
 }
 
@@ -243,7 +266,6 @@ async function manejarEnvioFormulario(event) {
  * 3. DELETE (Eliminar): Elimina un cultivo por su ID.
  */
 async function eliminarCultivo(idCultivo) {
-    // ⚠️ REVISIÓN: Bloquear si no está autenticado
     if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para eliminar.');
 
     const cultivo = cultivosData.find(c => c.id === idCultivo);
@@ -254,33 +276,33 @@ async function eliminarCultivo(idCultivo) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}/${idCultivo}`, { 
-            method: 'DELETE',
-        });
+        // 🚩 CAMBIO: Usar llamarApi
+        const endpoint = `${API_CULTIVOS_ENDPOINT}/${idCultivo}`;
+        const response = await llamarApi(endpoint, 'DELETE');
 
         const resultado = await response.json();
 
         if (response.ok) {
             alert(resultado.mensaje || 'Cultivo eliminado.');
-            cargarCultivos(); // <-- Recarga que llamará al gráfico
+            cargarCultivos(); 
         } else {
             alert(`Error ${response.status}: ${resultado.error || 'No se pudo eliminar el cultivo.'}`);
         }
     } catch (error) {
         console.error('Error al eliminar:', error);
-        alert('Error de conexión con la API.');
+        // El error de conexión ya lo maneja llamarApi
     }
 }
 
 
 // --- 3. FUNCIONES DE UTILIDAD Y RENDERIZADO (EXISTENTES) ---
+// (Las funciones de soporte no requieren cambios, se mantienen igual)
 
 function filtrarCultivos() {
     const textoBusqueda = searchInput.value.toLowerCase().trim();
     
     if (textoBusqueda === '') {
         renderizarTabla(cultivosData);
-        // Si tienes gráficos que dependen de filtros, llama a dibujarGraficoGanancias(cultivosData) aquí.
         return;
     }
     
@@ -296,16 +318,13 @@ function filtrarCultivos() {
     });
     
     renderizarTabla(cultivosFiltrados);
-    // Si tienes gráficos que dependen de filtros, llama a dibujarGraficoGanancias(cultivosFiltrados) aquí.
 }
 
 function actualizarKpis(cultivos) {
     let costoTotal = 0;
     let ventaTotal = 0;
 
-    // <-- CAMBIO CLAVE N°4: Manejo seguro de null/undefined
     cultivos.forEach(cultivo => {
-        // Usa `|| 0` para tratar `null`, `undefined`, o `""` como 0.
         costoTotal += parseFloat(cultivo.precio_compra) || 0;
         ventaTotal += parseFloat(cultivo.precio_venta) || 0;
     });
@@ -371,7 +390,6 @@ function renderizarTabla(cultivos) {
             isAlert = true;
         }
         
-        // Uso de valores seguros (cultivo.precio_venta || 0) para evitar NaN
         const margen = ((cultivo.precio_venta || 0) - (cultivo.precio_compra || 0)).toFixed(2);
         
         row.insertCell().textContent = cultivo.nombre;
@@ -408,23 +426,19 @@ function renderizarTabla(cultivos) {
 }
 
 function cargarParaEdicion(cultivo) {
-    // ⚠️ REVISIÓN: Bloquear si no está autenticado
     if (!IS_AUTHENTICATED) return alert('Debes iniciar sesión para editar.');
     
-    // 1. Cargar datos al formulario
     document.getElementById('nombre').value = cultivo.nombre;
     document.getElementById('zona').value = cultivo.zona;
     document.getElementById('fecha_siembra').value = cultivo.fecha_siembra;
     document.getElementById('fecha_cosecha').value = cultivo.fecha_cosecha;
     
-    // Usar el operador || 0 para manejar null en la carga
     document.getElementById('precio_compra').value = (cultivo.precio_compra || 0).toFixed(2); 
     document.getElementById('precio_venta').value = (cultivo.precio_venta || 0).toFixed(2);
     
     document.getElementById('dias_alerta').value = cultivo.dias_alerta;
     document.getElementById('notas').value = cultivo.notas;
     
-    // 2. Configurar el modo edición
     modoEdicion = true;
     originalNameInput.value = cultivo.id; 
     submitButton.textContent = `Guardar Cambios de ${cultivo.nombre}`;
@@ -447,14 +461,8 @@ function resetFormulario() {
     document.getElementById('dias_alerta').value = '7';
 }
 
-/**
- * Dibuja un gráfico de barras con los 5 cultivos con mayor ganancia potencial.
- * @param {Array<Object>} cultivos - La lista de cultivos.
- */
 function dibujarGraficoGanancias(cultivos) {
-    // 1. Obtener y preparar datos (usa los datos pasados como argumento)
     const datosGanancia = cultivos.map(cultivo => {
-        // Asegurar que los valores null o vacíos se traten como 0.
         const compra = parseFloat(cultivo.precio_compra) || 0;
         const venta = parseFloat(cultivo.precio_venta) || 0;
         
@@ -464,35 +472,28 @@ function dibujarGraficoGanancias(cultivos) {
             nombre: cultivo.nombre,
             ganancia: ganancia
         };
-    }).filter(c => c.ganancia > 0) // Solo cultivos con ganancia
-      .sort((a, b) => b.ganancia - a.ganancia) // Ordenar de mayor a menor
-      .slice(0, 5); // Tomar solo los 5 principales
+    }).filter(c => c.ganancia > 0) 
+      .sort((a, b) => b.ganancia - a.ganancia) 
+      .slice(0, 5); 
 
-    // Si no hay datos, limpiamos el canvas
     const canvasElement = document.getElementById('gananciaChart');
-    if (!canvasElement) return; // Asegurar que el elemento exista
+    if (!canvasElement) return;
 
     if (datosGanancia.length === 0) {
-        // Si ya hay un gráfico, lo destruimos
         if (window.gananciaChartInstance) {
             window.gananciaChartInstance.destroy();
-            window.gananciaChartInstance = null; // Limpiamos la instancia
+            window.gananciaChartInstance = null;
         }
-        // Opcional: mostrar un mensaje en el área del gráfico
-        // canvasElement.style.display = 'none'; // Si usas CSS para mostrar/ocultar mensaje
         return; 
     }
 
-    // 2. Extraer etiquetas y valores para Chart.js
     const etiquetas = datosGanancia.map(d => d.nombre);
     const valores = datosGanancia.map(d => d.ganancia.toFixed(2));
 
-    // 3. Destruir gráfico anterior si existe (para evitar duplicados al recargar)
     if (window.gananciaChartInstance) {
         window.gananciaChartInstance.destroy();
     }
 
-    // 4. Configuración y Creación del Gráfico
     const ctx = canvasElement.getContext('2d');
     
     window.gananciaChartInstance = new Chart(ctx, {
@@ -517,31 +518,31 @@ function dibujarGraficoGanancias(cultivos) {
                         text: 'Ganancia (€)'
                     },
                     ticks: {
-                        color: '#ddd' // Color de texto para tema oscuro
+                        color: '#ddd' 
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)' // Líneas de cuadrícula
+                        color: 'rgba(255, 255, 255, 0.1)' 
                     }
                 },
                 x: {
                     ticks: {
-                        color: '#ddd' // Color de texto para tema oscuro
+                        color: '#ddd' 
                     },
                     grid: {
-                        color: 'rgba(255, 255, 255, 0.1)' // Líneas de cuadrícula
+                        color: 'rgba(255, 255, 255, 0.1)' 
                     }
                 }
             },
             plugins: {
                 legend: {
                     labels: {
-                        color: '#ddd' // Color de la leyenda
+                        color: '#ddd'
                     }
                 },
                 title: {
                     display: true,
                     text: 'Proyección Top 5 (Venta - Compra)',
-                    color: '#fff' // Color del título
+                    color: '#fff'
                 }
             }
         }
@@ -552,7 +553,6 @@ function dibujarGraficoGanancias(cultivos) {
 // --- 4. INICIALIZACIÓN DE EVENTOS (MODIFICADA) ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Mostrar la interfaz de autenticación al inicio
     toggleInterface(false); 
     
     // 2. Event Listeners para Autenticación
@@ -564,13 +564,11 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', manejarEnvioFormulario);
     searchInput.addEventListener('input', filtrarCultivos); 
 
-    // Botón de Cancelar Edición (Se mantiene la lógica de inyección)
+    // Botón de Cancelar Edición
     const btnCancelar = document.createElement('button');
     btnCancelar.textContent = 'Limpiar / Cancelar Edición';
     btnCancelar.classList.add('delete-btn');
     btnCancelar.type = 'button'; 
     btnCancelar.onclick = resetFormulario;
     form.appendChild(btnCancelar);
-
-    // NOTA: La función cargarCultivos() se llama ahora SOLO al iniciar sesión con éxito.
 });

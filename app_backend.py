@@ -15,7 +15,13 @@ RUTA_DATOS_USUARIOS = '/vol/data/usuarios.json'
 
 app = Flask(__name__)
 # 🚩 CONFIGURACIÓN CORS (CORREGIDA): supports_credentials fuera del diccionario resources
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, supports_credentials=True)
+# app_backend.py (Línea 17)
+
+# Código CORREGIDO:
+CORS(app, 
+     resources={r"/*": {"origins": "https://nombre-unico-de-tu-api-flask.fly.dev", 
+                       "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}}, 
+     supports_credentials=True)
 # Variables globales para los datos
 CULTIVOS = [] 
 USUARIOS = [] 

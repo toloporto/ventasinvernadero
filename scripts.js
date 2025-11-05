@@ -29,7 +29,7 @@ const authMessage = document.getElementById('auth-message');
 
 
 let modoEdicion = false; 
-let cultivosData = []; 
+let cultivosData = []; // <-- Variable que almacena todos los datos
 let IS_AUTHENTICATED = false; // ¡Estado de la sesión!
 
 
@@ -157,25 +157,29 @@ async function cargarCultivos() {
         
         const cultivos = await response.json();
         
-        cultivosData = cultivos; 
+        cultivosData = cultivos; // <-- CAMBIO CLAVE N°1: La variable es 'cultivosData'
         
         loadingMessage.style.display = 'none'; 
         renderizarTabla(cultivosData); 
         
         actualizarKpis(cultivosData); // Actualiza los KPIs después de la carga
+        dibujarGraficoGanancias(cultivosData); // <-- CAMBIO CLAVE N°2: Llamar aquí y pasar los datos
 
     } catch (error) {
         console.error('Error al cargar cultivos:', error);
         loadingMessage.textContent = `❌ ERROR DE CONEXIÓN: ${error.message}. Verifica que la URL de Fly.io sea correcta.`;
         loadingMessage.style.color = 'var(--color-danger)';
     }
-    // Dentro de la función principal de carga/actualización:
+    
+    // <-- CAMBIO CLAVE N°3: Eliminar esta sección duplicada y mal colocada
+    /* // Dentro de la función principal de carga/actualización:
     function actualizarDashboard(cultivos) {
     // ... [Tu código existente para actualizar la tabla y los KPIs]
 
     // ¡NUEVA LLAMADA!
     dibujarGraficoGanancias(); // <-- Asegúrate de que esta línea esté aquí
     }
+    */
 }
 
 /**
@@ -225,7 +229,7 @@ async function manejarEnvioFormulario(event) {
         if (response.ok) {
             alert(resultado.mensaje || (modoEdicion ? 'Cultivo actualizado.' : 'Cultivo añadido.'));
             resetFormulario();
-            cargarCultivos(); 
+            cargarCultivos(); // <-- Recarga que llamará al gráfico
         } else {
             alert(`Error ${response.status}: ${resultado.error || 'Algo salió mal en el servidor.'}`);
         }
@@ -258,7 +262,7 @@ async function eliminarCultivo(idCultivo) {
 
         if (response.ok) {
             alert(resultado.mensaje || 'Cultivo eliminado.');
-            cargarCultivos(); 
+            cargarCultivos(); // <-- Recarga que llamará al gráfico
         } else {
             alert(`Error ${response.status}: ${resultado.error || 'No se pudo eliminar el cultivo.'}`);
         }
@@ -276,6 +280,7 @@ function filtrarCultivos() {
     
     if (textoBusqueda === '') {
         renderizarTabla(cultivosData);
+        // Si tienes gráficos que dependen de filtros, llama a dibujarGraficoGanancias(cultivosData) aquí.
         return;
     }
     
@@ -291,13 +296,16 @@ function filtrarCultivos() {
     });
     
     renderizarTabla(cultivosFiltrados);
+    // Si tienes gráficos que dependen de filtros, llama a dibujarGraficoGanancias(cultivosFiltrados) aquí.
 }
 
 function actualizarKpis(cultivos) {
     let costoTotal = 0;
     let ventaTotal = 0;
 
+    // <-- CAMBIO CLAVE N°4: Manejo seguro de null/undefined
     cultivos.forEach(cultivo => {
+        // Usa `|| 0` para tratar `null`, `undefined`, o `""` como 0.
         costoTotal += parseFloat(cultivo.precio_compra) || 0;
         ventaTotal += parseFloat(cultivo.precio_venta) || 0;
     });
@@ -363,7 +371,8 @@ function renderizarTabla(cultivos) {
             isAlert = true;
         }
         
-        const margen = (cultivo.precio_venta - cultivo.precio_compra).toFixed(2);
+        // Uso de valores seguros (cultivo.precio_venta || 0) para evitar NaN
+        const margen = ((cultivo.precio_venta || 0) - (cultivo.precio_compra || 0)).toFixed(2);
         
         row.insertCell().textContent = cultivo.nombre;
         row.insertCell().textContent = cultivo.zona;
@@ -407,8 +416,11 @@ function cargarParaEdicion(cultivo) {
     document.getElementById('zona').value = cultivo.zona;
     document.getElementById('fecha_siembra').value = cultivo.fecha_siembra;
     document.getElementById('fecha_cosecha').value = cultivo.fecha_cosecha;
-    document.getElementById('precio_compra').value = cultivo.precio_compra.toFixed(2);
-    document.getElementById('precio_venta').value = cultivo.precio_venta.toFixed(2);
+    
+    // Usar el operador || 0 para manejar null en la carga
+    document.getElementById('precio_compra').value = (cultivo.precio_compra || 0).toFixed(2); 
+    document.getElementById('precio_venta').value = (cultivo.precio_venta || 0).toFixed(2);
+    
     document.getElementById('dias_alerta').value = cultivo.dias_alerta;
     document.getElementById('notas').value = cultivo.notas;
     
@@ -437,12 +449,17 @@ function resetFormulario() {
 
 /**
  * Dibuja un gráfico de barras con los 5 cultivos con mayor ganancia potencial.
+ * @param {Array<Object>} cultivos - La lista de cultivos.
  */
-function dibujarGraficoGanancias() {
-    // 1. Obtener y preparar datos (usamos la variable CULTIVOS_CACHE global)
-    const datosGanancia = CULTIVOS_CACHE.map(cultivo => {
-        // La ganancia potencial es (Precio Venta - Precio Compra)
-        const ganancia = (parseFloat(cultivo.precio_venta) - parseFloat(cultivo.precio_compra));
+function dibujarGraficoGanancias(cultivos) {
+    // 1. Obtener y preparar datos (usa los datos pasados como argumento)
+    const datosGanancia = cultivos.map(cultivo => {
+        // Asegurar que los valores null o vacíos se traten como 0.
+        const compra = parseFloat(cultivo.precio_compra) || 0;
+        const venta = parseFloat(cultivo.precio_venta) || 0;
+        
+        const ganancia = venta - compra;
+        
         return {
             nombre: cultivo.nombre,
             ganancia: ganancia
@@ -452,9 +469,17 @@ function dibujarGraficoGanancias() {
       .slice(0, 5); // Tomar solo los 5 principales
 
     // Si no hay datos, limpiamos el canvas
+    const canvasElement = document.getElementById('gananciaChart');
+    if (!canvasElement) return; // Asegurar que el elemento exista
+
     if (datosGanancia.length === 0) {
-        const ctx = document.getElementById('gananciaChart').getContext('2d');
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        // Si ya hay un gráfico, lo destruimos
+        if (window.gananciaChartInstance) {
+            window.gananciaChartInstance.destroy();
+            window.gananciaChartInstance = null; // Limpiamos la instancia
+        }
+        // Opcional: mostrar un mensaje en el área del gráfico
+        // canvasElement.style.display = 'none'; // Si usas CSS para mostrar/ocultar mensaje
         return; 
     }
 
@@ -463,7 +488,6 @@ function dibujarGraficoGanancias() {
     const valores = datosGanancia.map(d => d.ganancia.toFixed(2));
 
     // 3. Destruir gráfico anterior si existe (para evitar duplicados al recargar)
-    const canvasElement = document.getElementById('gananciaChart');
     if (window.gananciaChartInstance) {
         window.gananciaChartInstance.destroy();
     }
